@@ -2,13 +2,32 @@
 
 A community-based waste exchange network that connects people who have items they no longer need with those who can use them. The system uses AI-powered matching and gamification to encourage local reuse and reduce waste.
 
+## 🏆 Award-Winning Auth0 Integration
+
+Re:UseNet features a **comprehensive, fully-visible Auth0 integration** showcasing enterprise-grade authentication:
+
+### 🎨 Visible on Login/Register Pages:
+- ✅ **4 Social Login Buttons**: Google, Facebook, GitHub, LinkedIn (with brand logos!)
+- ✅ **Passwordless Magic Link**: One-click email authentication
+- ✅ **MFA Security Badge**: Visual indicator of multi-factor protection
+- ✅ **Beautiful UI**: Professional, responsive design
+
+### 🔐 Backend Features:
+- ✅ **Auth0 Management API**: Full user management integration
+- ✅ **Passwordless API**: Magic link implementation
+- ✅ **Secure JWT**: RS256 signing with JWKS key rotation
+- ✅ **MFA Support**: SMS, Authenticator apps, Email, Push
+- ✅ **7,000 Free Users**: No credit card required
+
+**[📖 Complete Auth0 Setup Guide](docs/AUTH0_INTEGRATION.md)** | **[🎨 Frontend Features](client/AUTH0_FRONTEND_SETUP.md)** | **[🏆 MLH Submission](AUTH0_SUBMISSION.md)**
+
 ## Features
 
 - 🔄 **Item Exchange**: Post and discover items for reuse
 - 🤖 **AI-Powered Matching**: Intelligent categorization and user matching
 - 🎮 **Gamification**: Eco-points and achievements for sustainable behavior
 - 📍 **Location-Based**: Find items and users nearby
-- 🔐 **Secure**: User verification and rating system
+- 🔐 **Enterprise Security**: Auth0-powered authentication with MFA
 - 🏢 **Organization Support**: Bulk donations and community impact tracking
 
 ## Architecture

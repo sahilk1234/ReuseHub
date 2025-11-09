@@ -30,6 +30,20 @@ router.post(
 );
 
 /**
+ * POST /api/auth/auth0-login - Login/Register user via Auth0
+ * Public endpoint
+ * Requirements: 5.1, 5.2
+ */
+router.post(
+  '/auth0-login',
+  authRateLimiter,
+  asyncHandler(async (req, res) => {
+    const controller = getController();
+    await controller.auth0Login(req, res);
+  })
+);
+
+/**
  * POST /api/auth/refresh - Refresh access token
  * Public endpoint
  * Requirements: 5.2

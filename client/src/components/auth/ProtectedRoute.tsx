@@ -10,7 +10,16 @@ export default function ProtectedRoute({ children, requireVerified = false }: Pr
   const { isAuthenticated, isLoading, user } = useAuth();
   const location = useLocation();
 
+  console.log('[ProtectedRoute]', {
+    path: location.pathname,
+    isLoading,
+    isAuthenticated,
+    hasUser: !!user,
+    userEmail: user?.email
+  });
+
   if (isLoading) {
+    console.log('[ProtectedRoute] Still loading, showing spinner');
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
@@ -22,6 +31,7 @@ export default function ProtectedRoute({ children, requireVerified = false }: Pr
   }
 
   if (!isAuthenticated) {
+    console.log('[ProtectedRoute] Not authenticated, redirecting to login');
     // Redirect to login page but save the location they were trying to access
     return <Navigate to="/login" state={{ from: location }} replace />;
   }

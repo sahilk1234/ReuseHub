@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
+import { Auth0Provider } from './contexts/Auth0Provider';
 import Layout from './components/layout/Layout';
 import ProtectedRoute from './components/auth/ProtectedRoute';
 import Home from './pages/Home';
@@ -11,18 +12,21 @@ import Dashboard from './pages/Dashboard';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Profile from './pages/Profile';
+import Auth0Callback from './pages/Auth0Callback';
 
 function App() {
   return (
     <BrowserRouter>
-      <AuthProvider>
-        <Routes>
-          <Route path="/" element={<Layout />}>
-            <Route index element={<Home />} />
-            <Route path="items" element={<Items />} />
-            <Route path="items/:id" element={<ItemDetail />} />
-            <Route path="login" element={<Login />} />
-            <Route path="register" element={<Register />} />
+      <Auth0Provider>
+        <AuthProvider>
+          <Routes>
+            <Route path="/" element={<Layout />}>
+              <Route index element={<Home />} />
+              <Route path="items" element={<Items />} />
+              <Route path="items/:id" element={<ItemDetail />} />
+              <Route path="login" element={<Login />} />
+              <Route path="register" element={<Register />} />
+              <Route path="callback" element={<Auth0Callback />} />
             
             {/* Protected Routes */}
             <Route
@@ -60,6 +64,7 @@ function App() {
           </Route>
         </Routes>
       </AuthProvider>
+      </Auth0Provider>
     </BrowserRouter>
   );
 }

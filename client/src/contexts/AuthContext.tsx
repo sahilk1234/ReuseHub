@@ -51,10 +51,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Check for existing session on mount
   useEffect(() => {
+    console.log('[AuthContext] Initializing, checking for existing token...');
     const token = localStorage.getItem('accessToken');
     if (token) {
+      console.log('[AuthContext] Token found, fetching current user');
       fetchCurrentUser();
     } else {
+      console.log('[AuthContext] No token found, user not authenticated');
       setIsLoading(false);
     }
   }, []);
@@ -62,31 +65,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const fetchCurrentUser = async () => {
     try {
       const token = localStorage.getItem('accessToken');
+      console.log('[AuthContext] fetchCurrentUser - Token exists:', !!token);
+      
       if (!token) {
+        console.log('[AuthContext] No token, skipping user fetch');
         setIsLoading(false);
         return;
       }
 
+      console.log('[AuthContext] Calling /auth/me endpoint...');
       const response = await fetch(`${API_URL}/auth/me`, {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
       });
 
+      console.log('[AuthContext] /auth/me response status:', response.status);
+
       if (response.ok) {
         const data = await response.json();
+        console.log('[AuthContext] User data received:', data.data?.email);
         setUser(data.data);
       } else {
+        const errorData = await response.text();
+        console.error('[AuthContext] Failed to fetch user, status:', response.status, 'error:', errorData);
         // Token is invalid, clear it
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');
+        console.log('[AuthContext] Cleared invalid tokens');
       }
     } catch (error) {
-      console.error('Failed to fetch current user:', error);
+      console.error('[AuthContext] Failed to fetch current user:', error);
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshToken');
+      console.log('[AuthContext] Cleared tokens due to error');
     } finally {
       setIsLoading(false);
+      console.log('[AuthContext] fetchCurrentUser completed');
     }
   };
 

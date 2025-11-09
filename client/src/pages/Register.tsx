@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import Auth0LoginButtons from '../components/auth/Auth0LoginButtons';
 
 export default function Register() {
   const [formData, setFormData] = useState({
@@ -144,6 +145,9 @@ export default function Register() {
         )}
 
         <div className="card">
+          {/* Auth0 Social Login Buttons */}
+          <Auth0LoginButtons mode="signup" />
+
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
