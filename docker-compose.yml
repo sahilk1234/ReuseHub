@@ -1,0 +1,111 @@
+version: '3.8'
+
+services:
+  app:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    ports:
+      - "${PORT:-3000}:3000"
+    environment:
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=${PORT:-3000}
+      
+      # Database configuration
+      - DATABASE_TYPE=${DATABASE_TYPE:-postgresql}
+      - DATABASE_URL=${DATABASE_URL:-postgresql://postgres:password@database:5432/reusenet}
+      - DATABASE_HOST=${DATABASE_HOST:-database}
+      - DATABASE_PORT=${DATABASE_PORT:-5432}
+      - DATABASE_NAME=${DATABASE_NAME:-reusenet}
+      - DATABASE_USERNAME=${DATABASE_USERNAME:-postgres}
+      - DATABASE_PASSWORD=${DATABASE_PASSWORD:-password}
+      
+      # Storage configuration
+      - STORAGE_PROVIDER=${STORAGE_PROVIDER:-local}
+      - LOCAL_UPLOAD_PATH=${LOCAL_UPLOAD_PATH:-./uploads}
+      - LOCAL_BASE_URL=${LOCAL_BASE_URL:-http://localhost:3000}
+      
+      # Auth configuration
+      - AUTH_PROVIDER=${AUTH_PROVIDER:-custom}
+      - JWT_SECRET=${JWT_SECRET:-your-secret-key-change-in-production}
+      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-24h}
+      
+      # AI configuration
+      - AI_PROVIDER=${AI_PROVIDER:-openai}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      
+      # Maps configuration
+      - MAPS_PROVIDER=${MAPS_PROVIDER:-google}
+      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
+      
+      # Notification configuration
+      - NOTIFICATION_PROVIDER=${NOTIFICATION_PROVIDER:-sendgrid}
+      - SENDGRID_API_KEY=${SENDGRID_API_KEY}
+      - SENDGRID_FROM_EMAIL=${SENDGRID_FROM_EMAIL:-noreply@reusenet.com}
+      
+      # CORS configuration
+      - CORS_ORIGIN=${CORS_ORIGIN:-http://localhost:3000,http://localhost:3001}
+      - CORS_CREDENTIALS=${CORS_CREDENTIALS:-true}
+      
+      # Rate limiting
+      - RATE_LIMIT_WINDOW_MS=${RATE_LIMIT_WINDOW_MS:-900000}
+      - RATE_LIMIT_MAX=${RATE_LIMIT_MAX:-100}
+    
+    volumes:
+      - uploads_data:/app/uploads
+    
+    depends_on:
+      - database
+      - redis
+    
+    restart: unless-stopped
+    
+    networks:
+      - reusenet-network
+
+  database:
+    image: postgis/postgis:15-3.3-alpine
+    environment:
+      - POSTGRES_DB=${DATABASE_NAME:-reusenet}
+      - POSTGRES_USER=${DATABASE_USERNAME:-postgres}
+      - POSTGRES_PASSWORD=${DATABASE_PASSWORD:-password}
+    
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+    
+    ports:
+      - "${DATABASE_PORT:-5432}:5432"
+    
+    restart: unless-stopped
+    
+    networks:
+      - reusenet-network
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    
+    volumes:
+      - redis_data:/data
+    
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    
+    restart: unless-stopped
+    
+    networks:
+      - reusenet-network
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  uploads_data:
+    driver: local
+
+networks:
+  reusenet-network:
+    driver: bridge
