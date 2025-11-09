@@ -36,29 +36,10 @@ export default function ProtectedRoute({ children, requireVerified = false }: Pr
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if (requireVerified && user && !user.isVerified) {
-    return (
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="max-w-md mx-auto">
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
-            <div className="text-4xl mb-4">⚠️</div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-2">
-              Email Verification Required
-            </h2>
-            <p className="text-gray-600 mb-4">
-              Please verify your email address to access this feature. Check your inbox for the verification link.
-            </p>
-            <button
-              onClick={() => window.location.href = '/dashboard'}
-              className="btn-primary"
-            >
-              Go to Dashboard
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Skip email verification check - allow all authenticated users
+  // if (requireVerified && user && !user.isVerified) {
+  //   return verification message
+  // }
 
   return <>{children}</>;
 }
