@@ -8,6 +8,7 @@ import { INotificationService } from '../infrastructure/services/INotificationSe
 // Import adapters
 import { S3FileStorageService } from '../infrastructure/services/adapters/S3FileStorageService';
 import { LocalFileStorageService } from '../infrastructure/services/adapters/LocalFileStorageService';
+import { JWTAuthenticationService } from '../infrastructure/services/adapters/JWTAuthenticationService';
 import { OpenAIService } from '../infrastructure/services/adapters/OpenAIService';
 import { GoogleAIService } from '../infrastructure/services/adapters/GoogleAIService';
 import { GoogleMapsService } from '../infrastructure/services/adapters/GoogleMapsService';
@@ -64,28 +65,12 @@ export class ServiceFactory {
         throw new Error('Firebase adapter not yet implemented. Use custom provider.');
 
       case 'custom':
-        // Custom JWT authentication is handled by middleware
-        // Return a placeholder service that indicates custom auth is in use
-        return {
-          authenticate: async () => {
-            throw new Error('Custom authentication is handled by middleware');
-          },
-          generateToken: async () => {
-            throw new Error('Custom authentication is handled by middleware');
-          },
-          refreshToken: async () => {
-            throw new Error('Custom authentication is handled by middleware');
-          },
-          validateToken: async () => {
-            throw new Error('Custom authentication is handled by middleware');
-          },
-          revokeToken: async () => {
-            throw new Error('Custom authentication is handled by middleware');
-          },
-          getUserFromToken: async () => {
-            throw new Error('Custom authentication is handled by middleware');
-          },
-        } as IAuthenticationService;
+        // Custom JWT authentication
+        return new JWTAuthenticationService({
+          jwtSecret: config.config.jwtSecret,
+          jwtExpiresIn: config.config.jwtExpiresIn,
+          refreshTokenExpiresIn: config.config.refreshTokenExpiresIn || '7d'
+        });
 
       default:
         throw new Error(`Unsupported auth provider: ${config.provider}`);

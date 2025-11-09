@@ -13,6 +13,21 @@ export interface TokenPair {
 
 export interface IAuthenticationService {
   /**
+   * Hash a password
+   * @param password - The plain text password
+   * @returns Promise resolving to hashed password
+   */
+  hashPassword(password: string): Promise<string>;
+
+  /**
+   * Verify a password against a hash
+   * @param password - The plain text password
+   * @param hash - The hashed password
+   * @returns Promise resolving to true if password matches
+   */
+  verifyPassword(password: string, hash: string): Promise<boolean>;
+
+  /**
    * Authenticate a user using a JWT token
    * @param token - The JWT token to validate
    * @returns Promise resolving to authentication result

@@ -1,3 +1,5 @@
+import { injectable, inject } from 'inversify';
+import { TYPES } from '@/container/types';
 import { User, CreateUserData, UserProfile } from '../../domain/user/User';
 import { UserId } from '../../domain/user/value-objects/UserId';
 import { Email } from '../../domain/user/value-objects/Email';
@@ -8,6 +10,7 @@ import { INotificationService } from '../../infrastructure/services/INotificatio
 
 export interface RegisterUserCommand {
   email: string;
+  password: string;
   displayName: string;
   phone?: string;
   accountType: 'individual' | 'organization';
@@ -55,10 +58,14 @@ export interface IUserApplicationService {
   searchUsers(searchTerm: string, limit?: number): Promise<User[]>;
 }
 
+@injectable()
 export class UserApplicationService implements IUserApplicationService {
   constructor(
+    @inject(TYPES.IUserRepository)
     private readonly userRepository: IUserRepository,
+    @inject(TYPES.IAuthenticationService)
     private readonly authService: IAuthenticationService,
+    @inject(TYPES.INotificationService)
     private readonly notificationService: INotificationService
   ) {}
 
@@ -68,6 +75,9 @@ export class UserApplicationService implements IUserApplicationService {
     if (existingUser) {
       throw new Error('User with this email already exists');
     }
+
+    // Hash the password
+    const passwordHash = await this.authService.hashPassword(command.password);
 
     // Create user domain object
     const userData: CreateUserData = {
@@ -83,8 +93,8 @@ export class UserApplicationService implements IUserApplicationService {
 
     const user = User.create(userData);
 
-    // Save user to repository
-    await this.userRepository.save(user);
+    // Save user to repository with password hash
+    await this.userRepository.save(user, passwordHash);
 
     // Send verification email
     let verificationEmailSent = false;

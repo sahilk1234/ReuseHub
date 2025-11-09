@@ -31,6 +31,7 @@ interface AuthContextType {
 
 interface RegisterData {
   email: string;
+  password: string;
   displayName: string;
   phone?: string;
   accountType: 'individual' | 'organization';

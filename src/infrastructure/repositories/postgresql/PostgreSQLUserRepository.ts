@@ -1,3 +1,5 @@
+import { injectable, inject } from 'inversify';
+import { TYPES } from '@/container/types';
 import { IUserRepository } from '../IUserRepository';
 import { User, UserData } from '../../../domain/user/User';
 import { UserId } from '../../../domain/user/value-objects/UserId';
@@ -24,19 +26,23 @@ interface UserRow {
   updated_at: Date;
 }
 
+@injectable()
 export class PostgreSQLUserRepository implements IUserRepository {
-  constructor(private db: DatabaseConnection) {}
+  constructor(
+    @inject(TYPES.DatabaseConnection)
+    private db: DatabaseConnection
+  ) {}
 
-  async save(user: User): Promise<void> {
+  async save(user: User, passwordHash?: string): Promise<void> {
     const userData = user.toData();
     
     const query = `
       INSERT INTO users (
         id, email, display_name, phone, avatar, is_verified, account_type,
         latitude, longitude, address, eco_points, eco_points_transactions,
-        rating, total_exchanges, created_at, updated_at
+        rating, total_exchanges, password_hash, created_at, updated_at
       ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17
       )
       ON CONFLICT (id) DO UPDATE SET
         display_name = EXCLUDED.display_name,
@@ -51,6 +57,7 @@ export class PostgreSQLUserRepository implements IUserRepository {
         eco_points_transactions = EXCLUDED.eco_points_transactions,
         rating = EXCLUDED.rating,
         total_exchanges = EXCLUDED.total_exchanges,
+        password_hash = COALESCE(EXCLUDED.password_hash, users.password_hash),
         updated_at = EXCLUDED.updated_at
     `;
 
@@ -69,6 +76,7 @@ export class PostgreSQLUserRepository implements IUserRepository {
       JSON.stringify(userData.ecoPointsTransactions || []),
       userData.rating,
       userData.totalExchanges,
+      passwordHash || null,
       userData.createdAt,
       userData.updatedAt
     ];

@@ -1,3 +1,5 @@
+import { randomUUID } from 'crypto';
+
 export class ItemId {
   private readonly _value: string;
 
@@ -24,6 +26,6 @@ export class ItemId {
   }
 
   static generate(): ItemId {
-    return new ItemId(crypto.randomUUID());
+    return new ItemId(randomUUID());
   }
 }

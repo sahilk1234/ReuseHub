@@ -5,7 +5,7 @@ import { Location } from '../../domain/user/value-objects/Location';
 
 export interface IUserRepository {
   // Basic CRUD operations
-  save(user: User): Promise<void>;
+  save(user: User, passwordHash?: string): Promise<void>;
   findById(id: UserId): Promise<User | null>;
   findByEmail(email: Email): Promise<User | null>;
   findAll(): Promise<User[]>;

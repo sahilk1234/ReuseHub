@@ -22,6 +22,7 @@ export class UserController {
 
       const command: RegisterUserCommand = {
         email: dto.email,
+        password: dto.password,
         displayName: dto.displayName,
         phone: dto.phone,
         accountType: dto.accountType,

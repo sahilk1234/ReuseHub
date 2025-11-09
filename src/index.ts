@@ -11,6 +11,7 @@ import { CreateItemsTableMigration } from './infrastructure/database/migrations/
 import { CreateExchangesTableMigration } from './infrastructure/database/migrations/004_create_exchanges_table';
 import { CreateBadgesTableMigration } from './infrastructure/database/migrations/005_create_badges_table';
 import { CreateAchievementsTableMigration } from './infrastructure/database/migrations/006_create_achievements_table';
+import { AddPasswordToUsersMigration } from './infrastructure/database/migrations/007_add_password_to_users';
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (error: Error) => {
@@ -52,6 +53,7 @@ async function runMigrations(): Promise<void> {
       new CreateExchangesTableMigration(),
       new CreateBadgesTableMigration(),
       new CreateAchievementsTableMigration(),
+      new AddPasswordToUsersMigration(),
     ];
 
     await migrationRunner.runMigrations(migrations);

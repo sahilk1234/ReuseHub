@@ -1,3 +1,5 @@
+import { randomUUID } from 'crypto';
+
 export class ExchangeId {
   private readonly _value: string;
 
@@ -24,6 +26,6 @@ export class ExchangeId {
   }
 
   static generate(): ExchangeId {
-    return new ExchangeId(crypto.randomUUID());
+    return new ExchangeId(randomUUID());
   }
 }

@@ -8,6 +8,10 @@ export class RegisterUserDto {
 
   @IsString()
   @IsNotEmpty()
+  password!: string;
+
+  @IsString()
+  @IsNotEmpty()
   displayName!: string;
 
   @IsString()

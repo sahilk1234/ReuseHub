@@ -22,6 +22,14 @@ export class Auth0AuthenticationService implements IAuthenticationService {
     });
   }
 
+  async hashPassword(password: string): Promise<string> {
+    throw new Error('Password hashing not supported with Auth0. Use Auth0 for authentication.');
+  }
+
+  async verifyPassword(password: string, hash: string): Promise<boolean> {
+    throw new Error('Password verification not supported with Auth0. Use Auth0 for authentication.');
+  }
+
   async authenticate(token: string): Promise<AuthResult> {
     try {
       const decoded = await this.verifyToken(token);
