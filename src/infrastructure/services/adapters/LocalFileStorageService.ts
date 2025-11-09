@@ -1,6 +1,6 @@
-import * as fs from 'fs/promises';
-import * as path from 'path';
-import { IFileStorageService } from '../IFileStorageService';
+import * as fs from "fs/promises";
+import * as path from "path";
+import { IFileStorageService } from "../IFileStorageService";
 
 export interface LocalStorageConfig {
   uploadDirectory: string;
@@ -10,21 +10,38 @@ export interface LocalStorageConfig {
 export class LocalFileStorageService implements IFileStorageService {
   constructor(private config: LocalStorageConfig) {}
 
-  async uploadFile(file: Buffer, filePath: string, contentType: string): Promise<string> {
+  private normalizeRel(p: string): string {
+    return p
+      .replace(/\\/g, "/")
+      .replace(/^\/+/, "")
+      .replace(/^uploads\/+/i, "");
+  }
+
+  /** Build a public URL that contains exactly one '/uploads/' prefix. */
+  private buildPublicUrl(rel: string): string {
+    const base = this.config.baseUrl.replace(/\/+$/, ""); // trim trailing slash
+    const cleanRel = this.normalizeRel(rel);
+    const hasUploads = /\/uploads$/i.test(base);
+    return `${base}${hasUploads ? "" : "/uploads"}/${cleanRel}`;
+  }
+
+  async uploadFile(
+    file: Buffer,
+    filePath: string,
+    _contentType: string
+  ): Promise<string> {
     try {
-      const fullPath = path.join(this.config.uploadDirectory, filePath);
-      const directory = path.dirname(fullPath);
-
-      // Ensure directory exists
-      await fs.mkdir(directory, { recursive: true });
-
-      // Write file
+      const rel = this.normalizeRel(filePath); // e.g. 'items/<id>/image.webp'
+      const fullPath = path.join(this.config.uploadDirectory, rel); // '/app/uploads/items/<id>/image.webp'
+      await fs.mkdir(path.dirname(fullPath), { recursive: true });
       await fs.writeFile(fullPath, file);
-
-      // Return public URL
-      return this.getPublicUrl(filePath);
+      return this.buildPublicUrl(rel); // 'http://.../uploads/items/<id>/image.webp'
     } catch (error) {
-      throw new Error(`Failed to upload file locally: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Failed to upload file locally: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
     }
   }
 
@@ -34,10 +51,14 @@ export class LocalFileStorageService implements IFileStorageService {
       await fs.unlink(fullPath);
     } catch (error) {
       // If file doesn't exist, consider it successfully deleted
-      if ((error as any)?.code === 'ENOENT') {
+      if ((error as any)?.code === "ENOENT") {
         return;
       }
-      throw new Error(`Failed to delete file locally: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      throw new Error(
+        `Failed to delete file locally: ${
+          error instanceof Error ? error.message : "Unknown error"
+        }`
+      );
     }
   }
 
@@ -57,7 +78,7 @@ export class LocalFileStorageService implements IFileStorageService {
 
   private getPublicUrl(filePath: string): string {
     // Normalize path separators for URLs
-    const normalizedPath = filePath.replace(/\\/g, '/');
+    const normalizedPath = filePath.replace(/\\/g, "/");
     return `${this.config.baseUrl}/${normalizedPath}`;
   }
 }

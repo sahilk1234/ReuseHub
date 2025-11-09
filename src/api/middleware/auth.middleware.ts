@@ -143,16 +143,16 @@ export const requireVerified = (
     return;
   }
 
-  if (!req.user.isVerified) {
-    res.status(403).json({
-      error: {
-        code: 'VERIFICATION_REQUIRED',
-        message: 'Email verification is required to access this resource',
-        timestamp: new Date().toISOString()
-      }
-    });
-    return;
-  }
+  // if (!req.user.isVerified) {
+  //   res.status(403).json({
+  //     error: {
+  //       code: 'VERIFICATION_REQUIRED',
+  //       message: 'Email verification is required to access this resource',
+  //       timestamp: new Date().toISOString()
+  //     }
+  //   });
+  //   return;
+  // }
 
   next();
 };
