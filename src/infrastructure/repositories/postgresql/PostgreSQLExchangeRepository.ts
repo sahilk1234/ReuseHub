@@ -14,6 +14,8 @@ interface ExchangeRow {
   status: ExchangeStatusValue;
   scheduled_pickup?: Date;
   completed_at?: Date;
+  giver_confirmed_at?: Date;
+  receiver_confirmed_at?: Date;
   giver_rating_score?: number;
   giver_rating_review?: string;
   giver_rating_rated_by?: string;
@@ -37,16 +39,19 @@ export class PostgreSQLExchangeRepository implements IExchangeRepository {
     const query = `
       INSERT INTO exchanges (
         id, item_id, giver_id, receiver_id, status, scheduled_pickup,
-        completed_at, giver_rating_score, giver_rating_review, giver_rating_rated_by, giver_rating_rated_at,
+        completed_at, giver_confirmed_at, receiver_confirmed_at,
+        giver_rating_score, giver_rating_review, giver_rating_rated_by, giver_rating_rated_at,
         receiver_rating_score, receiver_rating_review, receiver_rating_rated_by, receiver_rating_rated_at,
         eco_points_awarded, cancellation_reason, created_at, updated_at
       ) VALUES (
-        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19
+        $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21
       )
       ON CONFLICT (id) DO UPDATE SET
         status = EXCLUDED.status,
         scheduled_pickup = EXCLUDED.scheduled_pickup,
         completed_at = EXCLUDED.completed_at,
+        giver_confirmed_at = EXCLUDED.giver_confirmed_at,
+        receiver_confirmed_at = EXCLUDED.receiver_confirmed_at,
         giver_rating_score = EXCLUDED.giver_rating_score,
         giver_rating_review = EXCLUDED.giver_rating_review,
         giver_rating_rated_by = EXCLUDED.giver_rating_rated_by,
@@ -68,6 +73,8 @@ export class PostgreSQLExchangeRepository implements IExchangeRepository {
       exchangeData.status,
       exchangeData.scheduledPickup || null,
       exchangeData.completedAt || null,
+      exchangeData.giverConfirmedAt || null,
+      exchangeData.receiverConfirmedAt || null,
       exchangeData.giverRating?.score || null,
       exchangeData.giverRating?.review || null,
       exchangeData.giverRating?.ratedBy || null,
@@ -600,6 +607,8 @@ export class PostgreSQLExchangeRepository implements IExchangeRepository {
       status: row.status,
       scheduledPickup: row.scheduled_pickup,
       completedAt: row.completed_at,
+      giverConfirmedAt: row.giver_confirmed_at,
+      receiverConfirmedAt: row.receiver_confirmed_at,
       giverRating: (row.giver_rating_score && row.giver_rating_rated_by && row.giver_rating_rated_at) ? {
         score: row.giver_rating_score,
         review: row.giver_rating_review,

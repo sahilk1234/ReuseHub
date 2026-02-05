@@ -101,6 +101,9 @@ Choose an auth provider and configure accordingly:
 - `JWT_SECRET`: Secret key for JWT signing
 - `JWT_EXPIRES_IN`: Access token expiration (e.g., 24h)
 - `REFRESH_TOKEN_EXPIRES_IN`: Refresh token expiration (e.g., 7d)
+- `JWT_ISSUER`: Optional token issuer (e.g., https://yourdomain.com/)
+- `JWT_AUDIENCE`: Optional token audience (comma-separated for multiple values)
+- `JWT_CLOCK_TOLERANCE_SEC`: Optional clock skew tolerance in seconds
 
 #### Auth0
 - `AUTH_PROVIDER=auth0`

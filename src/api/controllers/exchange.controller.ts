@@ -106,11 +106,14 @@ export class ExchangeController {
         ecoPointsAwarded: dto.ecoPointsAwarded
       };
 
-      await this.exchangeService.completeExchange(command);
+      const result = await this.exchangeService.completeExchange(command);
 
       res.status(200).json({
         success: true,
-        message: 'Exchange completed successfully. Eco-points have been awarded!',
+        message: result.completed
+          ? 'Exchange completed successfully. Eco-points have been awarded!'
+          : 'Confirmation recorded. Waiting for the other participant.',
+        data: { completed: result.completed },
         timestamp: new Date().toISOString()
       });
     } catch (error: any) {
@@ -212,6 +215,8 @@ export class ExchangeController {
           status: exchange.status.value,
           scheduledPickup: exchange.scheduledPickup,
           completedAt: exchange.completedAt,
+          giverConfirmedAt: exchange.giverConfirmedAt,
+          receiverConfirmedAt: exchange.receiverConfirmedAt,
           giverRating: exchange.giverRating?.toData(),
           receiverRating: exchange.receiverRating?.toData(),
           ecoPointsAwarded: exchange.ecoPointsAwarded,
@@ -259,6 +264,8 @@ export class ExchangeController {
         status: exchange.status.value,
         scheduledPickup: exchange.scheduledPickup,
         completedAt: exchange.completedAt,
+        giverConfirmedAt: exchange.giverConfirmedAt,
+        receiverConfirmedAt: exchange.receiverConfirmedAt,
         ecoPointsAwarded: exchange.ecoPointsAwarded,
         createdAt: exchange.createdAt,
         updatedAt: exchange.updatedAt
@@ -302,6 +309,8 @@ export class ExchangeController {
         receiverId: exchange.receiverId.value,
         status: exchange.status.value,
         scheduledPickup: exchange.scheduledPickup,
+        giverConfirmedAt: exchange.giverConfirmedAt,
+        receiverConfirmedAt: exchange.receiverConfirmedAt,
         createdAt: exchange.createdAt,
         updatedAt: exchange.updatedAt
       }));
@@ -341,6 +350,8 @@ export class ExchangeController {
         receiverId: exchange.receiverId.value,
         status: exchange.status.value,
         completedAt: exchange.completedAt,
+        giverConfirmedAt: exchange.giverConfirmedAt,
+        receiverConfirmedAt: exchange.receiverConfirmedAt,
         createdAt: exchange.createdAt
       }));
 

@@ -19,6 +19,8 @@ export interface ExchangeData {
   status: ExchangeStatusValue;
   scheduledPickup?: Date;
   completedAt?: Date;
+  giverConfirmedAt?: Date;
+  receiverConfirmedAt?: Date;
   giverRating?: RatingData;
   receiverRating?: RatingData;
   ecoPointsAwarded: number;
@@ -39,6 +41,8 @@ export class Exchange {
     private _updatedAt: Date,
     private _scheduledPickup?: Date,
     private _completedAt?: Date,
+    private _giverConfirmedAt?: Date,
+    private _receiverConfirmedAt?: Date,
     private _giverRating?: Rating,
     private _receiverRating?: Rating,
     private _cancellationReason?: string
@@ -69,6 +73,8 @@ export class Exchange {
       now,
       data.scheduledPickup,
       undefined, // completedAt
+      undefined, // giverConfirmedAt
+      undefined, // receiverConfirmedAt
       undefined, // giverRating
       undefined, // receiverRating
       undefined // cancellationReason
@@ -96,6 +102,8 @@ export class Exchange {
       data.updatedAt,
       data.scheduledPickup,
       data.completedAt,
+      data.giverConfirmedAt,
+      data.receiverConfirmedAt,
       giverRating,
       receiverRating,
       data.cancellationReason
@@ -128,6 +136,14 @@ export class Exchange {
 
   get completedAt(): Date | undefined {
     return this._completedAt;
+  }
+
+  get giverConfirmedAt(): Date | undefined {
+    return this._giverConfirmedAt;
+  }
+
+  get receiverConfirmedAt(): Date | undefined {
+    return this._receiverConfirmedAt;
   }
 
   get giverRating(): Rating | undefined {
@@ -177,6 +193,30 @@ export class Exchange {
     this._completedAt = new Date();
     this._ecoPointsAwarded = ecoPointsAwarded;
     this._updatedAt = new Date();
+  }
+
+  confirmHandoffBy(userId: UserId): boolean {
+    if (!this._status.isAccepted()) {
+      throw new Error('Can only confirm handoff after exchange is accepted');
+    }
+
+    if (this.isGiver(userId)) {
+      if (this._giverConfirmedAt) {
+        throw new Error('Giver has already confirmed handoff');
+      }
+      this._giverConfirmedAt = new Date();
+    } else if (this.isReceiver(userId)) {
+      if (this._receiverConfirmedAt) {
+        throw new Error('Receiver has already confirmed handoff');
+      }
+      this._receiverConfirmedAt = new Date();
+    } else {
+      throw new Error('Only exchange participants can confirm handoff');
+    }
+
+    this._updatedAt = new Date();
+
+    return Boolean(this._giverConfirmedAt && this._receiverConfirmedAt);
   }
 
   cancel(reason: string): void {
@@ -290,6 +330,8 @@ export class Exchange {
       status: this._status.value,
       scheduledPickup: this._scheduledPickup,
       completedAt: this._completedAt,
+      giverConfirmedAt: this._giverConfirmedAt,
+      receiverConfirmedAt: this._receiverConfirmedAt,
       giverRating: this._giverRating?.toData(),
       receiverRating: this._receiverRating?.toData(),
       ecoPointsAwarded: this._ecoPointsAwarded,

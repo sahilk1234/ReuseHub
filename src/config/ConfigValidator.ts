@@ -195,6 +195,31 @@ export class ConfigValidator {
         if (config.nodeEnv === 'production' && authConfig.jwtSecret === 'your-secret-key') {
           invalidFields.push('JWT_SECRET (must be changed in production)');
         }
+        if (authConfig.jwtIssuer !== undefined && String(authConfig.jwtIssuer).trim().length === 0) {
+          invalidFields.push('JWT_ISSUER (must be a non-empty string)');
+        }
+        if (authConfig.jwtAudience !== undefined) {
+          if (typeof authConfig.jwtAudience === 'string') {
+            if (authConfig.jwtAudience.trim().length === 0) {
+              invalidFields.push('JWT_AUDIENCE (must be a non-empty string)');
+            }
+          } else if (Array.isArray(authConfig.jwtAudience)) {
+            const invalidAudience = authConfig.jwtAudience.some(
+              (aud: any) => typeof aud !== 'string' || aud.trim().length === 0
+            );
+            if (authConfig.jwtAudience.length === 0 || invalidAudience) {
+              invalidFields.push('JWT_AUDIENCE (must include at least one non-empty value)');
+            }
+          } else {
+            invalidFields.push('JWT_AUDIENCE (must be a string or array of strings)');
+          }
+        }
+        if (authConfig.clockToleranceSec !== undefined) {
+          const value = Number(authConfig.clockToleranceSec);
+          if (!Number.isFinite(value) || value < 0) {
+            invalidFields.push('JWT_CLOCK_TOLERANCE_SEC (must be a non-negative number)');
+          }
+        }
         break;
 
       default:

@@ -12,6 +12,8 @@ interface Exchange {
   status: 'requested' | 'accepted' | 'completed' | 'cancelled';
   scheduledPickup?: string;
   completedAt?: string;
+  giverConfirmedAt?: string;
+  receiverConfirmedAt?: string;
   giverRating?: {
     value: number;
     review?: string;
@@ -201,6 +203,33 @@ export default function Exchanges() {
     }
   };
 
+  const toLocalInputValue = (date: Date) => {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  };
+
+  const setQuickPickup = (type: 'today-pm' | 'tomorrow-am' | 'weekend') => {
+    const now = new Date();
+    let target = new Date(now);
+
+    if (type === 'today-pm') {
+      target.setHours(17, 0, 0, 0);
+      if (target < now) {
+        target.setDate(target.getDate() + 1);
+      }
+    } else if (type === 'tomorrow-am') {
+      target.setDate(target.getDate() + 1);
+      target.setHours(10, 0, 0, 0);
+    } else {
+      const day = target.getDay(); // 0=Sun
+      const daysUntilSat = (6 - day + 7) % 7 || 7;
+      target.setDate(target.getDate() + daysUntilSat);
+      target.setHours(10, 0, 0, 0);
+    }
+
+    setScheduledPickup(toLocalInputValue(target));
+  };
+
   const handleCompleteExchange = async () => {
     if (!selectedExchange) return;
 
@@ -223,10 +252,13 @@ export default function Exchanges() {
         throw new Error(errorData.error?.message || 'Failed to complete exchange');
       }
 
+      const data = await response.json();
       setShowCompleteModal(false);
       setSelectedExchange(null);
       fetchExchanges();
-      alert('Exchange completed successfully! Eco-points have been awarded.');
+      alert(data.message || (data.data?.completed
+        ? 'Exchange completed successfully! Eco-points have been awarded.'
+        : 'Confirmation recorded. Waiting for the other participant.'));
     } catch (err: any) {
       alert(err.message || 'Failed to complete exchange');
     } finally {
@@ -393,6 +425,24 @@ export default function Exchanges() {
                 <span className="font-medium">Scheduled:</span>{' '}
                 {new Date(exchange.scheduledPickup).toLocaleString()}
               </p>
+            )}
+
+            {/* Handoff Confirmation */}
+            {exchange.status === 'accepted' && (
+              <div className="text-xs text-gray-600 mb-2">
+                <div>
+                  <span className="font-medium">Your confirmation:</span>{' '}
+                  {isGiver(exchange)
+                    ? (exchange.giverConfirmedAt ? 'Confirmed' : 'Pending')
+                    : (exchange.receiverConfirmedAt ? 'Confirmed' : 'Pending')}
+                </div>
+                <div>
+                  <span className="font-medium">Other party:</span>{' '}
+                  {isGiver(exchange)
+                    ? (exchange.receiverConfirmedAt ? 'Confirmed' : 'Pending')
+                    : (exchange.giverConfirmedAt ? 'Confirmed' : 'Pending')}
+                </div>
+              </div>
             )}
 
             {/* Completed Info */}
@@ -581,6 +631,29 @@ export default function Exchanges() {
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Scheduled Pickup (Optional)
               </label>
+              <div className="flex flex-wrap gap-2 mb-3">
+                <button
+                  type="button"
+                  className="px-3 py-1 text-xs rounded-full border border-gray-300 hover:bg-gray-50"
+                  onClick={() => setQuickPickup('today-pm')}
+                >
+                  Today PM
+                </button>
+                <button
+                  type="button"
+                  className="px-3 py-1 text-xs rounded-full border border-gray-300 hover:bg-gray-50"
+                  onClick={() => setQuickPickup('tomorrow-am')}
+                >
+                  Tomorrow AM
+                </button>
+                <button
+                  type="button"
+                  className="px-3 py-1 text-xs rounded-full border border-gray-300 hover:bg-gray-50"
+                  onClick={() => setQuickPickup('weekend')}
+                >
+                  Weekend
+                </button>
+              </div>
               <input
                 type="datetime-local"
                 value={scheduledPickup}
@@ -616,13 +689,13 @@ export default function Exchanges() {
       {showCompleteModal && selectedExchange && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <h3 className="text-xl font-semibold text-gray-900 mb-4">Complete Exchange</h3>
+            <h3 className="text-xl font-semibold text-gray-900 mb-4">Confirm Handoff</h3>
             <p className="text-sm text-gray-600 mb-4">
-              Mark this exchange as completed. Both parties will earn eco-points!
+              Confirm that the handoff happened. The exchange completes once both people confirm.
             </p>
             <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
               <p className="text-sm text-green-800">
-                <span className="font-medium">Eco-Points:</span> You'll earn 10 points for completing this exchange.
+                <span className="font-medium">Eco-Points:</span> You'll earn points once both confirmations are in.
               </p>
             </div>
             <div className="flex space-x-3">
@@ -641,7 +714,7 @@ export default function Exchanges() {
                 className="flex-1 btn-primary"
                 disabled={submitting}
               >
-                {submitting ? 'Completing...' : 'Complete'}
+                {submitting ? 'Confirming...' : 'Confirm'}
               </button>
             </div>
           </div>

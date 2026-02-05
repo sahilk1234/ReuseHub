@@ -74,12 +74,14 @@ export class DIContainer {
     const { ExchangeController } = require('@/api/controllers/exchange.controller');
     const { MatchingController } = require('@/api/controllers/matching.controller');
     const { AuthController } = require('@/api/controllers/auth.controller');
+    const { PointsController } = require('@/api/controllers/points.controller');
 
     container.bind(TYPES.ItemController).to(ItemController).inSingletonScope();
     container.bind(TYPES.UserController).to(UserController).inSingletonScope();
     container.bind(TYPES.ExchangeController).to(ExchangeController).inSingletonScope();
     container.bind(TYPES.MatchingController).to(MatchingController).inSingletonScope();
     container.bind(TYPES.AuthController).to(AuthController).inSingletonScope();
+    container.bind(TYPES.PointsController).to(PointsController).inSingletonScope();
   }
 
   static reset(): void {

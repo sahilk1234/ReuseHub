@@ -9,6 +9,7 @@ import { INotificationService } from '../infrastructure/services/INotificationSe
 import { S3FileStorageService } from '../infrastructure/services/adapters/S3FileStorageService';
 import { LocalFileStorageService } from '../infrastructure/services/adapters/LocalFileStorageService';
 import { JWTAuthenticationService } from '../infrastructure/services/adapters/JWTAuthenticationService';
+import { Auth0AuthenticationService } from '../infrastructure/services/adapters/Auth0AuthenticationService';
 import { OpenAIService } from '../infrastructure/services/adapters/OpenAIService';
 import { GoogleAIService } from '../infrastructure/services/adapters/GoogleAIService';
 import { GoogleMapsService } from '../infrastructure/services/adapters/GoogleMapsService';
@@ -53,8 +54,12 @@ export class ServiceFactory {
   static createAuthService(config: AuthConfig): IAuthenticationService {
     switch (config.provider) {
       case 'auth0':
-        // Auth0 adapter would be implemented here
-        throw new Error('Auth0 adapter not yet implemented. Use custom provider.');
+        return new Auth0AuthenticationService({
+          domain: config.config.domain,
+          clientId: config.config.clientId,
+          clientSecret: config.config.clientSecret,
+          audience: config.config.audience
+        });
 
       case 'okta':
         // Okta adapter would be implemented here
@@ -69,7 +74,10 @@ export class ServiceFactory {
         return new JWTAuthenticationService({
           jwtSecret: config.config.jwtSecret,
           jwtExpiresIn: config.config.jwtExpiresIn,
-          refreshTokenExpiresIn: config.config.refreshTokenExpiresIn || '7d'
+          refreshTokenExpiresIn: config.config.refreshTokenExpiresIn || '7d',
+          jwtIssuer: config.config.jwtIssuer,
+          jwtAudience: config.config.jwtAudience,
+          clockToleranceSec: config.config.clockToleranceSec
         });
 
       default:

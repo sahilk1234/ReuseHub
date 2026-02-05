@@ -1,6 +1,6 @@
 import jwt from 'jsonwebtoken';
 import jwksClient from 'jwks-rsa';
-import { ManagementClient, AuthenticationClient } from 'auth0';
+import { ManagementClient, AuthenticationClient, UserInfoClient } from 'auth0';
 import { hash, compare } from 'bcrypt';
 import { AuthResult, IAuthenticationService, TokenPair } from '../IAuthenticationService';
 
@@ -29,6 +29,7 @@ export class Auth0AuthenticationService implements IAuthenticationService {
   private jwksClient: jwksClient.JwksClient;
   private managementClient: ManagementClient;
   private authClient: AuthenticationClient;
+  private userInfoClient: UserInfoClient;
   private readonly SALT_ROUNDS = 10;
 
   constructor(private config: Auth0Config) {
@@ -53,6 +54,11 @@ export class Auth0AuthenticationService implements IAuthenticationService {
       domain: config.domain,
       clientId: config.clientId,
       clientSecret: config.clientSecret,
+    });
+
+    // Initialize Auth0 UserInfo client
+    this.userInfoClient = new UserInfoClient({
+      domain: config.domain,
     });
 
     console.log('🔐 Auth0 Authentication Service initialized');
@@ -159,12 +165,82 @@ export class Auth0AuthenticationService implements IAuthenticationService {
     return this.authenticate(token);
   }
 
+  /**
+   * Verify a real Auth0 access token (RS256 via JWKS).
+   * This should be used for validating tokens coming directly from Auth0.
+   */
+  async verifyAuth0AccessToken(token: string): Promise<any> {
+    return new Promise((resolve, reject) => {
+      const decoded = jwt.decode(token, { complete: true });
+
+      if (!decoded || !decoded.header || !decoded.header.kid) {
+        return reject(new Error('Invalid token format'));
+      }
+
+      if (decoded.header.alg !== 'RS256') {
+        return reject(new Error('Invalid token algorithm'));
+      }
+
+      this.jwksClient.getSigningKey(decoded.header.kid, (err: any, key: any) => {
+        if (err) {
+          return reject(err);
+        }
+
+        const signingKey = key?.getPublicKey();
+
+        if (!signingKey) {
+          return reject(new Error('Unable to get signing key'));
+        }
+
+        jwt.verify(
+          token,
+          signingKey,
+          {
+            audience: this.config.audience,
+            issuer: `https://${this.config.domain}/`,
+            algorithms: ['RS256'],
+          },
+          (verifyErr, payload) => {
+            if (verifyErr) {
+              return reject(verifyErr);
+            }
+            resolve(payload);
+          }
+        );
+      });
+    });
+  }
+
   private async verifyToken(token: string): Promise<any> {
     return new Promise((resolve, reject) => {
       // First, try to decode the token to get the header
       const decoded = jwt.decode(token, { complete: true });
       
-      if (!decoded || !decoded.header || !decoded.header.kid) {
+      if (!decoded || !decoded.header || !decoded.header.alg) {
+        return reject(new Error('Invalid token format'));
+      }
+
+      // If token was issued locally by this service, use HS256 verification
+      if (decoded.header.alg === 'HS256') {
+        jwt.verify(
+          token,
+          this.config.clientSecret,
+          {
+            audience: this.config.audience,
+            issuer: `https://${this.config.domain}/`,
+            algorithms: ['HS256'],
+          },
+          (verifyErr, payload) => {
+            if (verifyErr) {
+              return reject(verifyErr);
+            }
+            resolve(payload);
+          }
+        );
+        return;
+      }
+
+      if (!decoded.header.kid) {
         return reject(new Error('Invalid token format'));
       }
 
@@ -269,6 +345,21 @@ export class Auth0AuthenticationService implements IAuthenticationService {
       return user.data;
     } catch (error) {
       console.error('❌ Failed to get Auth0 user profile:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Auth0-specific: Get user info from access token
+   * Uses the /userinfo endpoint to resolve email/name when missing in token
+   */
+  async getUserInfoFromToken(accessToken: string): Promise<any> {
+    try {
+      const info = await this.userInfoClient.getUserInfo(accessToken);
+      // SDK returns JSONApiResponse; unwrap if needed
+      return (info as any).data || info;
+    } catch (error) {
+      console.error('❌ Failed to get Auth0 user info:', error);
       throw error;
     }
   }

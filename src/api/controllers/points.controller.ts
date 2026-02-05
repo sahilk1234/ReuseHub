@@ -2,6 +2,7 @@ import { Request, Response, NextFunction } from 'express';
 import { inject, injectable } from 'inversify';
 import { TYPES } from '@/container/types';
 import { IPointsApplicationService } from '@/application/services/PointsApplicationService';
+import { IUserApplicationService } from '@/application/services/UserApplicationService';
 import {
   LeaderboardQueryDto,
   LeaderboardEntryDto,
@@ -13,7 +14,9 @@ import {
 export class PointsController {
   constructor(
     @inject(TYPES.IPointsApplicationService)
-    private readonly pointsService: IPointsApplicationService
+    private readonly pointsService: IPointsApplicationService,
+    @inject(TYPES.IUserApplicationService)
+    private readonly userService: IUserApplicationService
   ) {}
 
   async getUserAchievements(
@@ -22,7 +25,7 @@ export class PointsController {
     next: NextFunction
   ): Promise<void> {
     try {
-      const userId = req.params.userId || (req as any).user?.userId;
+      const userId = req.params.userId || (req as any).user?.userId || (req as any).userId;
 
       if (!userId) {
         res.status(400).json({ error: 'User ID is required' });
@@ -62,6 +65,35 @@ export class PointsController {
       };
 
       res.json(response);
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getUserTransactions(
+    req: Request,
+    res: Response,
+    next: NextFunction
+  ): Promise<void> {
+    try {
+      const userId = (req as any).user?.userId || (req as any).userId || req.params.userId;
+
+      if (!userId) {
+        res.status(400).json({ error: 'User ID is required' });
+        return;
+      }
+
+      const user = await this.userService.getUserProfile(userId);
+      const transactions = user.ecoPoints.transactions.map((t) => ({
+        points: t.points,
+        reason: t.reason,
+        timestamp: t.timestamp
+      }));
+
+      res.json({
+        userId,
+        transactions
+      });
     } catch (error) {
       next(error);
     }

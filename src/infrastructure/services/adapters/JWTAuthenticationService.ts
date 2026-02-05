@@ -6,6 +6,9 @@ export interface JWTConfig {
   jwtSecret: string;
   jwtExpiresIn: string;
   refreshTokenExpiresIn: string;
+  jwtIssuer?: string;
+  jwtAudience?: string | string[];
+  clockToleranceSec?: number;
 }
 
 export class JWTAuthenticationService implements IAuthenticationService {
@@ -23,7 +26,7 @@ export class JWTAuthenticationService implements IAuthenticationService {
 
   async authenticate(token: string): Promise<AuthResult> {
     try {
-      const decoded = jwt.verify(token, this.config.jwtSecret) as any;
+      const decoded = this.verifyAccessToken(token);
       
       return {
         userId: decoded.userId,
@@ -37,18 +40,40 @@ export class JWTAuthenticationService implements IAuthenticationService {
   }
 
   async generateToken(userId: string, email: string, roles?: string[]): Promise<TokenPair> {
-    const payload = { userId, email, roles };
+    const payload = { userId, email, roles, type: 'access' };
+    const signOptions: jwt.SignOptions = {
+      expiresIn: this.config.jwtExpiresIn,
+      algorithm: 'HS256'
+    };
+    if (this.config.jwtIssuer) {
+      signOptions.issuer = this.config.jwtIssuer;
+    }
+    if (this.config.jwtAudience) {
+      signOptions.audience = this.config.jwtAudience;
+    }
+
     const accessToken = jwt.sign(
       payload,
       this.config.jwtSecret,
-      { expiresIn: this.config.jwtExpiresIn } as jwt.SignOptions
+      signOptions
     );
 
     const refreshPayload = { userId, email, type: 'refresh' };
+    const refreshOptions: jwt.SignOptions = {
+      expiresIn: this.config.refreshTokenExpiresIn,
+      algorithm: 'HS256'
+    };
+    if (this.config.jwtIssuer) {
+      refreshOptions.issuer = this.config.jwtIssuer;
+    }
+    if (this.config.jwtAudience) {
+      refreshOptions.audience = this.config.jwtAudience;
+    }
+
     const refreshToken = jwt.sign(
       refreshPayload,
       this.config.jwtSecret,
-      { expiresIn: this.config.refreshTokenExpiresIn } as jwt.SignOptions
+      refreshOptions
     );
 
     // Parse expiration time to seconds
@@ -63,12 +88,7 @@ export class JWTAuthenticationService implements IAuthenticationService {
 
   async refreshToken(refreshToken: string): Promise<TokenPair> {
     try {
-      const decoded = jwt.verify(refreshToken, this.config.jwtSecret) as any;
-      
-      if (decoded.type !== 'refresh') {
-        throw new Error('Invalid refresh token');
-      }
-
+      const decoded = this.verifyRefreshToken(refreshToken);
       return this.generateToken(decoded.userId, decoded.email, decoded.roles);
     } catch (error) {
       throw new Error('Invalid or expired refresh token');
@@ -77,7 +97,7 @@ export class JWTAuthenticationService implements IAuthenticationService {
 
   async validateToken(token: string): Promise<boolean> {
     try {
-      jwt.verify(token, this.config.jwtSecret);
+      this.verifyAccessToken(token);
       return true;
     } catch (error) {
       return false;
@@ -110,5 +130,43 @@ export class JWTAuthenticationService implements IAuthenticationService {
       case 'd': return value * 86400;
       default: return 3600;
     }
+  }
+
+  private buildVerifyOptions(): jwt.VerifyOptions {
+    const options: jwt.VerifyOptions = {
+      algorithms: ['HS256']
+    };
+
+    if (this.config.jwtIssuer) {
+      options.issuer = this.config.jwtIssuer;
+    }
+    if (this.config.jwtAudience) {
+      options.audience = this.config.jwtAudience;
+    }
+    if (this.config.clockToleranceSec !== undefined) {
+      options.clockTolerance = this.config.clockToleranceSec;
+    }
+
+    return options;
+  }
+
+  private verifyAccessToken(token: string): any {
+    const decoded = jwt.verify(token, this.config.jwtSecret, this.buildVerifyOptions()) as any;
+
+    if (decoded.type && decoded.type !== 'access') {
+      throw new Error('Invalid token type');
+    }
+
+    return decoded;
+  }
+
+  private verifyRefreshToken(token: string): any {
+    const decoded = jwt.verify(token, this.config.jwtSecret, this.buildVerifyOptions()) as any;
+
+    if (decoded.type !== 'refresh') {
+      throw new Error('Invalid refresh token');
+    }
+
+    return decoded;
   }
 }

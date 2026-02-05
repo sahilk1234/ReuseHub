@@ -19,6 +19,7 @@ interface Item {
     longitude: number;
     address: string;
   };
+  distanceKm?: number;
   createdAt: string;
 }
 
@@ -45,6 +46,9 @@ export default function Items() {
   
   const [showFilters, setShowFilters] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [useGeoLocation, setUseGeoLocation] = useState(false);
+  const [geoLocation, setGeoLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [geoError, setGeoError] = useState<string | null>(null);
 
   const categories = [
     'Furniture',
@@ -79,9 +83,15 @@ export default function Items() {
       if (filters.category) {
         params.append('category', filters.category);
       }
-      if (user && filters.maxDistance) {
-        params.append('latitude', user.location.latitude.toString());
-        params.append('longitude', user.location.longitude.toString());
+      const locationToUse = geoLocation
+        ? geoLocation
+        : user && user.location && user.location.latitude && user.location.longitude
+          ? { latitude: user.location.latitude, longitude: user.location.longitude }
+          : null;
+
+      if (locationToUse && filters.maxDistance) {
+        params.append('latitude', locationToUse.latitude.toString());
+        params.append('longitude', locationToUse.longitude.toString());
         params.append('maxDistance', filters.maxDistance.toString());
       }
 
@@ -117,6 +127,27 @@ export default function Items() {
       maxDistance: 50,
       condition: '',
     });
+  };
+
+  const requestGeoLocation = () => {
+    setGeoError(null);
+    if (!navigator.geolocation) {
+      setGeoError('Geolocation is not supported by your browser.');
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setGeoLocation({
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude
+        });
+      },
+      (err) => {
+        setGeoError(err.message || 'Failed to get location.');
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
   };
 
   const getConditionBadgeColor = (condition: string) => {
@@ -227,7 +258,7 @@ export default function Items() {
               </select>
             </div>
 
-            {user && (
+            {(user || useGeoLocation) && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Max Distance (km)
@@ -240,6 +271,31 @@ export default function Items() {
                   max="500"
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
                 />
+                <div className="mt-3 flex items-center space-x-2">
+                  <input
+                    id="useGeoLocation"
+                    type="checkbox"
+                    checked={useGeoLocation}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setUseGeoLocation(checked);
+                      if (checked) {
+                        requestGeoLocation();
+                      } else {
+                        setGeoLocation(null);
+                      }
+                    }}
+                  />
+                  <label htmlFor="useGeoLocation" className="text-sm text-gray-700">
+                    Use my current location
+                  </label>
+                  {geoLocation && (
+                    <span className="text-xs text-green-600">Location active</span>
+                  )}
+                </div>
+                {geoError && (
+                  <div className="text-xs text-red-600 mt-1">{geoError}</div>
+                )}
               </div>
             )}
 
@@ -340,6 +396,9 @@ export default function Items() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
                         </svg>
                         {item.location.address.split(',')[0]}
+                        {item.distanceKm !== undefined && (
+                          <span className="ml-2 text-xs text-gray-400">• {item.distanceKm} km away</span>
+                        )}
                       </div>
                       {item.category && (
                         <span className="bg-gray-100 px-2 py-1 rounded">

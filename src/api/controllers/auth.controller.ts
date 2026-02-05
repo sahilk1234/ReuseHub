@@ -30,9 +30,15 @@ export class AuthController {
         throw new AppError(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
       }
 
-      // In a real implementation, you would verify the password here
-      // For now, we'll generate a token assuming the password is correct
-      // TODO: Implement password verification
+      const passwordHash = await this.userService.getPasswordHashByEmail(dto.email);
+      if (!passwordHash) {
+        throw new AppError(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
+      }
+
+      const isValidPassword = await this.authService.verifyPassword(dto.password, passwordHash);
+      if (!isValidPassword) {
+        throw new AppError(401, 'INVALID_CREDENTIALS', 'Invalid email or password');
+      }
 
       // Generate tokens
       const tokens = await this.authService.generateToken(
@@ -131,9 +137,43 @@ export class AuthController {
   public auth0Login = async (req: Request, res: Response): Promise<void> => {
     try {
       console.log('[AuthController] Auth0 login request received');
-      const { email, name, auth0Id, picture } = req.body;
+      const authHeader = req.headers.authorization;
+      if (!authHeader) {
+        throw new AppError(401, 'MISSING_AUTH_TOKEN', 'Authorization header is required');
+      }
 
-      console.log('[AuthController] Auth0 user data:', { email, name, auth0Id });
+      const parts = authHeader.split(' ');
+      if (parts.length !== 2 || parts[0] !== 'Bearer') {
+        throw new AppError(401, 'INVALID_AUTH_FORMAT', 'Authorization header must be in format: Bearer <token>');
+      }
+
+      const token = parts[1];
+
+      if (!('verifyAuth0AccessToken' in this.authService)) {
+        throw new AppError(500, 'AUTH0_NOT_CONFIGURED', 'Auth0 provider is not configured');
+      }
+
+      const decoded = await (this.authService as any).verifyAuth0AccessToken(token);
+
+      const auth0Id = decoded.sub as string | undefined;
+      let email = decoded.email as string | undefined;
+      let name = decoded.name as string | undefined;
+      let picture = decoded.picture as string | undefined;
+
+      // If email/name missing in token, resolve via /userinfo
+      if ((!email || !name) && 'getUserInfoFromToken' in this.authService) {
+        try {
+          const info = await (this.authService as any).getUserInfoFromToken(token);
+          email = email || info?.email || info?.userinfo?.email;
+          name = name || info?.name || info?.nickname || info?.userinfo?.name;
+          picture = picture || info?.picture || info?.userinfo?.picture;
+          console.log('[AuthController] Resolved user info via /userinfo:', { email, name });
+        } catch (e: any) {
+          console.warn('[AuthController] Failed to resolve user info via /userinfo:', e?.message || e);
+        }
+      }
+
+      console.log('[AuthController] Auth0 token verified:', { auth0Id, email });
 
       if (!auth0Id) {
         throw new AppError(400, 'INVALID_REQUEST', 'Auth0 ID is required');
@@ -151,9 +191,9 @@ export class AuthController {
         console.log('[AuthController] User not found, creating new user');
         // Create new user if doesn't exist
         const result = await this.userService.registerUser({
-          email,
+          email: userEmail,
           password: `auth0_${auth0Id}_${Date.now()}`, // Random password for Auth0 users
-          displayName: name || email.split('@')[0],
+          displayName: name || userEmail.split('@')[0],
           accountType: 'individual',
           location: {
             latitude: 0, // Default location, user can update later
@@ -169,6 +209,21 @@ export class AuthController {
         console.log('[AuthController] User profile fetched');
       } else {
         console.log('[AuthController] Existing user found:', user.id.value);
+        // Refresh profile fields from Auth0 when available
+        const updates: { displayName?: string; avatar?: string } = {};
+        if (name && name !== user.profile.displayName) {
+          updates.displayName = name;
+        }
+        if (picture && picture !== user.profile.avatar) {
+          updates.avatar = picture;
+        }
+        if (Object.keys(updates).length > 0) {
+          await this.userService.updateUserProfile({
+            userId: user.id.value,
+            ...updates
+          } as any);
+          user = await this.userService.getUserProfile(user.id.value);
+        }
       }
 
       // Generate tokens
@@ -230,6 +285,7 @@ export class AuthController {
       const user = await this.userService.getUserProfile(req.userId);
       console.log('[AuthController] User profile retrieved:', user.email.value);
 
+      const isDev = process.env.NODE_ENV !== 'production';
       res.status(200).json({
         success: true,
         data: {
@@ -245,7 +301,14 @@ export class AuthController {
           rating: user.rating,
           totalExchanges: user.totalExchanges,
           createdAt: user.createdAt,
-          updatedAt: user.updatedAt
+          updatedAt: user.updatedAt,
+          ...(isDev && {
+            authDebug: {
+              userId: req.userId,
+              roles: req.user?.roles || [],
+              isVerified: req.user?.isVerified
+            }
+          })
         },
         timestamp: new Date().toISOString()
       });
@@ -255,6 +318,64 @@ export class AuthController {
         error.statusCode || 404,
         error.code || 'USER_NOT_FOUND',
         error.message || 'User not found'
+      );
+    }
+  };
+
+  /**
+   * GET /api/auth/auth0-session - Debug Auth0 session info (dev-only)
+   * Returns decoded token + /userinfo (no raw token)
+   */
+  public auth0SessionInfo = async (req: Request, res: Response): Promise<void> => {
+    try {
+      if (process.env.NODE_ENV === 'production') {
+        throw new AppError(403, 'FORBIDDEN', 'Not available in production');
+      }
+
+      const authHeader = req.headers.authorization;
+      if (!authHeader) {
+        throw new AppError(401, 'MISSING_AUTH_TOKEN', 'Authorization header is required');
+      }
+
+      const parts = authHeader.split(' ');
+      if (parts.length !== 2 || parts[0] !== 'Bearer') {
+        throw new AppError(401, 'INVALID_AUTH_FORMAT', 'Authorization header must be in format: Bearer <token>');
+      }
+
+      const token = parts[1];
+
+      if (!('verifyAuth0AccessToken' in this.authService)) {
+        throw new AppError(500, 'AUTH0_NOT_CONFIGURED', 'Auth0 provider is not configured');
+      }
+
+      const decoded = await (this.authService as any).verifyAuth0AccessToken(token);
+      let userInfo: any = null;
+
+      if ('getUserInfoFromToken' in this.authService) {
+        try {
+          userInfo = await (this.authService as any).getUserInfoFromToken(token);
+        } catch (e: any) {
+          userInfo = { error: e?.message || 'Failed to load /userinfo' };
+        }
+      }
+
+      res.status(200).json({
+        success: true,
+        data: {
+          decoded,
+          userInfo
+        },
+        timestamp: new Date().toISOString()
+      });
+    } catch (error: any) {
+      console.error('[AuthController] auth0SessionInfo error:', error);
+      if (error instanceof AppError) {
+        throw error;
+      }
+      throw new AppError(
+        500,
+        'AUTH0_SESSION_FAILED',
+        error.message || 'Failed to read Auth0 session'
       );
     }
   };

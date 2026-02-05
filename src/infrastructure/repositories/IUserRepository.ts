@@ -8,6 +8,7 @@ export interface IUserRepository {
   save(user: User, passwordHash?: string): Promise<void>;
   findById(id: UserId): Promise<User | null>;
   findByEmail(email: Email): Promise<User | null>;
+  getPasswordHashByEmail(email: Email): Promise<string | null>;
   findAll(): Promise<User[]>;
   delete(id: UserId): Promise<void>;
   

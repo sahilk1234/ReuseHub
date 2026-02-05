@@ -119,12 +119,26 @@ export class ConfigLoader {
           },
         };
       default:
+        const jwtAudienceRaw = process.env.JWT_AUDIENCE;
+        const jwtAudienceList = jwtAudienceRaw
+          ? jwtAudienceRaw.split(',').map(a => a.trim()).filter(a => a.length > 0)
+          : undefined;
+        const jwtAudience = jwtAudienceList && jwtAudienceList.length > 0
+          ? (jwtAudienceList.length === 1 ? jwtAudienceList[0] : jwtAudienceList)
+          : undefined;
+        const jwtClockToleranceSec = process.env.JWT_CLOCK_TOLERANCE_SEC
+          ? parseInt(process.env.JWT_CLOCK_TOLERANCE_SEC, 10)
+          : undefined;
+
         return {
           provider: 'custom',
           config: {
             jwtSecret: process.env.JWT_SECRET || 'your-secret-key',
             jwtExpiresIn: process.env.JWT_EXPIRES_IN || '24h',
             refreshTokenExpiresIn: process.env.REFRESH_TOKEN_EXPIRES_IN || '7d',
+            jwtIssuer: process.env.JWT_ISSUER,
+            jwtAudience,
+            clockToleranceSec: jwtClockToleranceSec,
           },
         };
     }

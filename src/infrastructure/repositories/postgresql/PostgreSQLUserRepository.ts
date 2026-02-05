@@ -24,6 +24,7 @@ interface UserRow {
   total_exchanges: number;
   created_at: Date;
   updated_at: Date;
+  password_hash?: string | null;
 }
 
 @injectable()
@@ -104,6 +105,15 @@ export class PostgreSQLUserRepository implements IUserRepository {
     }
 
     return this.mapRowToUser(result.rows[0]);
+  }
+
+  async getPasswordHashByEmail(email: Email): Promise<string | null> {
+    const query = 'SELECT password_hash FROM users WHERE email = $1';
+    const result = await this.db.query<{ password_hash: string | null }>(query, [email.value]);
+    if (result.rows.length === 0) {
+      return null;
+    }
+    return result.rows[0].password_hash ?? null;
   }
 
   async findAll(): Promise<User[]> {

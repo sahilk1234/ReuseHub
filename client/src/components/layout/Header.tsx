@@ -33,6 +33,9 @@ export default function Header() {
                 <Link to="/exchanges" className="text-gray-700 hover:text-primary-600 transition-colors">
                   My Exchanges
                 </Link>
+                <Link to="/points" className="text-gray-700 hover:text-primary-600 transition-colors">
+                  Eco-Points
+                </Link>
                 <Link to="/dashboard" className="text-gray-700 hover:text-primary-600 transition-colors">
                   Dashboard
                 </Link>
@@ -83,6 +86,13 @@ export default function Header() {
                         onClick={() => setShowUserMenu(false)}
                       >
                         Dashboard
+                      </Link>
+                      <Link
+                        to="/points"
+                        className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                        onClick={() => setShowUserMenu(false)}
+                      >
+                        Eco-Points
                       </Link>
                       <button
                         onClick={handleLogout}

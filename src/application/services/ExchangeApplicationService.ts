@@ -29,6 +29,10 @@ export interface CompleteExchangeCommand {
   ecoPointsAwarded?: number;
 }
 
+export interface CompleteExchangeResult {
+  completed: boolean;
+}
+
 export interface CancelExchangeCommand {
   exchangeId: string;
   userId: string; // Must be a participant
@@ -59,7 +63,7 @@ export interface ExchangeInitiationResult {
 export interface IExchangeApplicationService {
   initiateExchange(command: InitiateExchangeCommand): Promise<ExchangeInitiationResult>;
   acceptExchange(command: AcceptExchangeCommand): Promise<void>;
-  completeExchange(command: CompleteExchangeCommand): Promise<void>;
+  completeExchange(command: CompleteExchangeCommand): Promise<CompleteExchangeResult>;
   cancelExchange(command: CancelExchangeCommand): Promise<void>;
   rateExchange(command: RateExchangeCommand): Promise<void>;
   getExchangeDetails(exchangeId: string): Promise<Exchange>;
@@ -111,11 +115,10 @@ export class ExchangeApplicationService implements IExchangeApplicationService {
 
     // Check if there's already an active exchange for this item
     const existingExchange = await this.exchangeRepository.findExchangeForItem(
-      new ItemId(command.itemId),
-      'requested'
+      new ItemId(command.itemId)
     );
-    if (existingExchange) {
-      throw new Error('There is already a pending exchange request for this item');
+    if (existingExchange && (existingExchange.status.value === 'requested' || existingExchange.status.value === 'accepted')) {
+      throw new Error('There is already an active exchange for this item');
     }
 
     // Create exchange
@@ -127,7 +130,14 @@ export class ExchangeApplicationService implements IExchangeApplicationService {
     };
 
     const exchange = Exchange.create(exchangeData);
-    await this.exchangeRepository.save(exchange);
+    try {
+      await this.exchangeRepository.save(exchange);
+    } catch (error: any) {
+      if (error?.code === '23505') {
+        throw new Error('There is already an active exchange for this item');
+      }
+      throw error;
+    }
 
     // Update item status to pending
     item.markAsPending();
@@ -171,12 +181,19 @@ export class ExchangeApplicationService implements IExchangeApplicationService {
     }
   }
 
-  async completeExchange(command: CompleteExchangeCommand): Promise<void> {
+  async completeExchange(command: CompleteExchangeCommand): Promise<CompleteExchangeResult> {
     const exchange = await this.getExchangeById(command.exchangeId);
     
     // Verify the user is a participant
     if (!exchange.isParticipant(new UserId(command.userId))) {
       throw new Error('Only exchange participants can complete an exchange');
+    }
+
+    const bothConfirmed = exchange.confirmHandoffBy(new UserId(command.userId));
+    await this.exchangeRepository.save(exchange);
+
+    if (!bothConfirmed) {
+      return { completed: false };
     }
 
     // Calculate eco points (base points + bonus for quick completion)
@@ -217,6 +234,8 @@ export class ExchangeApplicationService implements IExchangeApplicationService {
     } catch (error) {
       console.error('Failed to send exchange completed notification:', error);
     }
+
+    return { completed: true };
   }
 
   async cancelExchange(command: CancelExchangeCommand): Promise<void> {

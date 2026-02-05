@@ -25,6 +25,15 @@ export default function Auth0LoginButtons({ mode }: Auth0LoginButtonsProps) {
     });
   };
 
+  const handleDatabaseLogin = (screenHint: 'login' | 'signup') => {
+    loginWithRedirect({
+      authorizationParams: {
+        connection: 'Username-Password-Authentication',
+        screen_hint: screenHint
+      }
+    });
+  };
+
   return (
     <div className="space-y-4">
       {/* Auth0 Section Header */}
@@ -38,6 +47,17 @@ export default function Auth0LoginButtons({ mode }: Auth0LoginButtonsProps) {
           </span>
         </div>
       </div>
+
+      {/* Database Connection */}
+      <button
+        type="button"
+        onClick={() => handleDatabaseLogin(mode)}
+        className="w-full flex items-center justify-center px-4 py-2 border-2 border-primary-500 rounded-lg shadow-sm bg-white hover:bg-primary-50 transition-colors"
+      >
+        <span className="text-sm font-medium text-primary-700">
+          {mode === 'signup' ? 'Sign up with Email' : 'Sign in with Email'}
+        </span>
+      </button>
 
       {/* Social Login Buttons */}
       <div className="grid grid-cols-2 gap-3">

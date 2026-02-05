@@ -88,4 +88,17 @@ router.get(
   })
 );
 
+/**
+ * GET /api/auth/auth0-session - Debug Auth0 session info (dev-only)
+ * Requires Bearer Auth0 access token
+ */
+router.get(
+  '/auth0-session',
+  standardRateLimiter,
+  asyncHandler(async (req, res) => {
+    const controller = getController();
+    await controller.auth0SessionInfo(req, res);
+  })
+);
+
 export default router;

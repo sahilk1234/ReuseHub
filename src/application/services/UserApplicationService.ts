@@ -51,6 +51,7 @@ export interface IUserApplicationService {
   updateUserLocation(command: UpdateLocationCommand): Promise<void>;
   getUserProfile(userId: string): Promise<User>;
   getUserByEmail(email: string): Promise<User | null>;
+  getPasswordHashByEmail(email: string): Promise<string | null>;
   verifyUser(command: VerifyUserCommand): Promise<void>;
   rateUser(command: RateUserCommand): Promise<void>;
   resendVerificationEmail(userId: string): Promise<void>;
@@ -229,6 +230,10 @@ export class UserApplicationService implements IUserApplicationService {
 
   async getUserByEmail(email: string): Promise<User | null> {
     return await this.userRepository.findByEmail(new Email(email));
+  }
+
+  async getPasswordHashByEmail(email: string): Promise<string | null> {
+    return await this.userRepository.getPasswordHashByEmail(new Email(email));
   }
 
   private async getUserById(userId: string): Promise<User> {
