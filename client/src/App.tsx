@@ -33,7 +33,7 @@ function App() {
             <Route
               path="post-item"
               element={
-                <ProtectedRoute requireVerified>
+                <ProtectedRoute>
                   <PostItem />
                 </ProtectedRoute>
               }
