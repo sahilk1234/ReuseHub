@@ -42,14 +42,14 @@ export class JWTAuthenticationService implements IAuthenticationService {
   async generateToken(userId: string, email: string, roles?: string[]): Promise<TokenPair> {
     const payload = { userId, email, roles, type: 'access' };
     const signOptions: jwt.SignOptions = {
-      expiresIn: this.config.jwtExpiresIn,
+      expiresIn: this.config.jwtExpiresIn as jwt.SignOptions['expiresIn'],
       algorithm: 'HS256'
     };
     if (this.config.jwtIssuer) {
-      signOptions.issuer = this.config.jwtIssuer;
+      signOptions.issuer = this.config.jwtIssuer as jwt.SignOptions['issuer'];
     }
     if (this.config.jwtAudience) {
-      signOptions.audience = this.config.jwtAudience;
+      signOptions.audience = this.config.jwtAudience as jwt.SignOptions['audience'];
     }
 
     const accessToken = jwt.sign(
@@ -60,14 +60,14 @@ export class JWTAuthenticationService implements IAuthenticationService {
 
     const refreshPayload = { userId, email, type: 'refresh' };
     const refreshOptions: jwt.SignOptions = {
-      expiresIn: this.config.refreshTokenExpiresIn,
+      expiresIn: this.config.refreshTokenExpiresIn as jwt.SignOptions['expiresIn'],
       algorithm: 'HS256'
     };
     if (this.config.jwtIssuer) {
-      refreshOptions.issuer = this.config.jwtIssuer;
+      refreshOptions.issuer = this.config.jwtIssuer as jwt.SignOptions['issuer'];
     }
     if (this.config.jwtAudience) {
-      refreshOptions.audience = this.config.jwtAudience;
+      refreshOptions.audience = this.config.jwtAudience as jwt.SignOptions['audience'];
     }
 
     const refreshToken = jwt.sign(
@@ -138,10 +138,13 @@ export class JWTAuthenticationService implements IAuthenticationService {
     };
 
     if (this.config.jwtIssuer) {
-      options.issuer = this.config.jwtIssuer;
+      options.issuer = this.config.jwtIssuer as jwt.VerifyOptions['issuer'];
     }
     if (this.config.jwtAudience) {
-      options.audience = this.config.jwtAudience;
+      // jsonwebtoken types expect string | RegExp | [..]; cast safely
+      options.audience = (Array.isArray(this.config.jwtAudience)
+        ? this.config.jwtAudience
+        : this.config.jwtAudience) as jwt.VerifyOptions['audience'];
     }
     if (this.config.clockToleranceSec !== undefined) {
       options.clockTolerance = this.config.clockToleranceSec;

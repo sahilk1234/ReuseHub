@@ -9,77 +9,29 @@ export class SeedData {
   async seedUsers(): Promise<User[]> {
     console.log('Seeding users...');
 
-    const usersData: CreateUserData[] = [
-      {
-        email: 'alice@example.com',
-        profile: {
-          displayName: 'Alice Johnson',
-          phone: '+1-555-0101',
-          isVerified: true,
-          accountType: 'individual'
-        },
-        location: {
-          latitude: 40.7128,
-          longitude: -74.0060,
-          address: '123 Main St, New York, NY 10001'
-        }
-      },
-      {
-        email: 'bob@example.com',
-        profile: {
-          displayName: 'Bob Smith',
-          phone: '+1-555-0102',
-          isVerified: true,
-          accountType: 'individual'
-        },
-        location: {
-          latitude: 40.7589,
-          longitude: -73.9851,
-          address: '456 Broadway, New York, NY 10013'
-        }
-      },
-      {
-        email: 'carol@example.com',
-        profile: {
-          displayName: 'Carol Davis',
-          phone: '+1-555-0103',
-          isVerified: true,
-          accountType: 'individual'
-        },
-        location: {
-          latitude: 40.7505,
-          longitude: -73.9934,
-          address: '789 Park Ave, New York, NY 10021'
-        }
-      },
-      {
-        email: 'greenorg@example.com',
-        profile: {
-          displayName: 'Green Community Org',
-          phone: '+1-555-0200',
-          isVerified: true,
-          accountType: 'organization'
-        },
-        location: {
-          latitude: 40.7282,
-          longitude: -73.7949,
-          address: '100 Community Center Dr, Queens, NY 11375'
-        }
-      },
-      {
-        email: 'david@example.com',
-        profile: {
-          displayName: 'David Wilson',
-          isVerified: false,
-          accountType: 'individual'
-        },
-        location: {
-          latitude: 40.6782,
-          longitude: -73.9442,
-          address: '321 Brooklyn Ave, Brooklyn, NY 11201'
-        }
-      }
+    const seedLocations = [
+      { address: '123 Main St, New York, NY 10001', latitude: 40.7128, longitude: -74.0060 },
+      { address: '456 Market St, San Francisco, CA 94103', latitude: 37.7749, longitude: -122.4194 },
+      { address: '789 Pine St, Seattle, WA 98101', latitude: 47.6062, longitude: -122.3321 },
+      { address: '200 W Madison St, Chicago, IL 60606', latitude: 41.8781, longitude: -87.6298 },
+      { address: '500 Congress Ave, Austin, TX 78701', latitude: 30.2672, longitude: -97.7431 },
+      { address: '1600 Larimer St, Denver, CO 80202', latitude: 39.7392, longitude: -104.9903 },
+      { address: '1 Beacon St, Boston, MA 02108', latitude: 42.3601, longitude: -71.0589 },
+      { address: '700 S Flower St, Los Angeles, CA 90017', latitude: 34.0522, longitude: -118.2437 },
+      { address: '191 Peachtree St NE, Atlanta, GA 30303', latitude: 33.7490, longitude: -84.3880 },
+      { address: '1122 SW Morrison St, Portland, OR 97205', latitude: 45.5152, longitude: -122.6784 }
     ];
+
+    const usersData: CreateUserData[] = Array.from({ length: 10 }).map((_, i) => ({
+      email: `demo${i + 1}@example.com`,
+      profile: {
+        displayName: `Demo User ${i + 1}`,
+        phone: `+1-555-01${(i + 1).toString().padStart(2, '0')}`,
+        isVerified: i % 2 === 0, // every other user verified
+        accountType: i === 0 ? 'organization' : 'individual'
+      },
+      location: seedLocations[i]
+    }));
 
     const users: User[] = [];
     
@@ -92,9 +44,7 @@ export class SeedData {
         user.updateRating(Math.random() * 2 + 3); // Rating between 3-5
       }
 
-      users.push(user);
-
-      // Insert user into database
+      // Insert or update user idempotently on email, then fetch the persisted row to get stable id
       const userDataForDb = user.toData();
       const query = `
         INSERT INTO users (
@@ -104,6 +54,20 @@ export class SeedData {
         ) VALUES (
           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
         )
+        ON CONFLICT (email) DO UPDATE SET
+          display_name = EXCLUDED.display_name,
+          phone = EXCLUDED.phone,
+          avatar = EXCLUDED.avatar,
+          is_verified = EXCLUDED.is_verified,
+          account_type = EXCLUDED.account_type,
+          latitude = EXCLUDED.latitude,
+          longitude = EXCLUDED.longitude,
+          address = EXCLUDED.address,
+          eco_points = EXCLUDED.eco_points,
+          eco_points_transactions = EXCLUDED.eco_points_transactions,
+          rating = EXCLUDED.rating,
+          total_exchanges = EXCLUDED.total_exchanges,
+          updated_at = EXCLUDED.updated_at
       `;
 
       const params = [
@@ -118,7 +82,7 @@ export class SeedData {
         userDataForDb.location.longitude,
         userDataForDb.location.address,
         userDataForDb.ecoPoints,
-        JSON.stringify(userDataForDb.ecoPointsTransactions || []),
+        JSON.stringify(userDataForDb.ecoPointsTransactions ? [...userDataForDb.ecoPointsTransactions] : []),
         userDataForDb.rating,
         userDataForDb.totalExchanges,
         userDataForDb.createdAt,
@@ -126,6 +90,21 @@ export class SeedData {
       ];
 
       await this.db.query(query, params);
+
+      // Get persisted user id (existing or newly inserted)
+      const row = await this.db.query<{ id: string }>('SELECT id FROM users WHERE email = $1', [userData.email]);
+      const persistedId = row.rows[0]?.id || userDataForDb.id;
+      const persisted = User.fromData({
+        ...userDataForDb,
+        id: persistedId,
+        profile: user.profile,
+        location: user.location.toData(),
+        ecoPoints: user.ecoPoints.value,
+        ecoPointsTransactions: [...user.ecoPoints.transactions],
+        rating: user.rating,
+        totalExchanges: user.totalExchanges
+      });
+      users.push(persisted);
     }
 
     console.log(`✓ Seeded ${users.length} users`);
@@ -135,113 +114,234 @@ export class SeedData {
   async seedItems(users: User[]): Promise<Item[]> {
     console.log('Seeding items...');
 
-    const itemsData: Array<CreateItemData & { userIndex: number }> = [
+    const productTemplates = [
       {
-        userIndex: 0, // Alice
-        userId: '',
-        details: {
-          title: 'Vintage Wooden Chair',
-          description: 'Beautiful vintage wooden chair in good condition. Perfect for dining room or office.',
-          category: 'Furniture',
-          tags: ['vintage', 'wooden', 'chair', 'dining'],
-          images: ['chair1.jpg', 'chair2.jpg'],
-          condition: 'good',
-          pickupInstructions: 'Available for pickup weekends only'
-        },
-        location: {
-          latitude: 40.7128,
-          longitude: -74.0060,
-          address: '123 Main St, New York, NY 10001'
-        }
+        title: 'Vintage Wooden Chair',
+        description: 'Classic solid-wood dining chair, minor scuffs, very sturdy.',
+        category: 'Furniture',
+        tags: ['vintage', 'chair', 'wood'],
+        images: [
+          'https://images.unsplash.com/photo-1489515217757-5fd1be406fef?auto=format&fit=crop&w=1200&q=80',
+          'https://images.unsplash.com/photo-1523419400520-2234951cf4aa?auto=format&fit=crop&w=1200&q=80'
+        ],
+        condition: 'good' as const,
+        pickupInstructions: 'Weekends preferred',
       },
       {
-        userIndex: 1, // Bob
-        userId: '',
-        details: {
-          title: 'Electric Kettle',
-          description: 'Barely used electric kettle, works perfectly. Great for tea and coffee lovers.',
-          category: 'Kitchen',
-          tags: ['electric', 'kettle', 'kitchen', 'appliance'],
-          images: ['kettle1.jpg'],
-          condition: 'like-new'
-        },
-        location: {
-          latitude: 40.7589,
-          longitude: -73.9851,
-          address: '456 Broadway, New York, NY 10013'
-        }
+        title: 'Electric Kettle',
+        description: '1.7L stainless steel, auto shut-off, barely used.',
+        category: 'Kitchen',
+        tags: ['kettle', 'appliance'],
+        images: [
+          'https://images.unsplash.com/photo-1509475826633-fed577a2c71b?auto=format&fit=crop&w=1200&q=80'
+        ],
+        condition: 'like-new' as const,
       },
       {
-        userIndex: 2, // Carol
-        userId: '',
-        details: {
-          title: 'Stack of Programming Books',
-          description: 'Collection of programming books including JavaScript, Python, and React. Great for beginners.',
-          category: 'Books',
-          tags: ['programming', 'books', 'javascript', 'python', 'react', 'education'],
-          images: ['books1.jpg', 'books2.jpg'],
-          condition: 'good'
-        },
-        location: {
-          latitude: 40.7505,
-          longitude: -73.9934,
-          address: '789 Park Ave, New York, NY 10021'
-        }
+        title: 'Mountain Bike Helmet',
+        description: 'MIPS medium size, no crashes, matte black.',
+        category: 'Sports',
+        tags: ['helmet', 'bike', 'mips'],
+        images: [
+          'https://images.unsplash.com/photo-1508609540374-0ef3c9e8ab78?auto=format&fit=crop&w=1200&q=80'
+        ],
+        condition: 'like-new' as const,
       },
       {
-        userIndex: 3, // Green Org
-        userId: '',
-        details: {
-          title: 'Office Supplies Bundle',
-          description: 'Large collection of office supplies including pens, paper, folders, and organizers.',
-          category: 'Office',
-          tags: ['office', 'supplies', 'stationery', 'bulk'],
-          images: ['office1.jpg'],
-          condition: 'new',
-          pickupInstructions: 'Pickup available Monday-Friday 9AM-5PM'
-        },
-        location: {
-          latitude: 40.7282,
-          longitude: -73.7949,
-          address: '100 Community Center Dr, Queens, NY 11375'
-        }
+        title: 'Coffee Maker',
+        description: 'Drip coffee machine with reusable filter, works great.',
+        category: 'Kitchen',
+        tags: ['coffee', 'appliance'],
+        images: [
+          'https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=1200&q=80'
+        ],
+        condition: 'good' as const,
       },
       {
-        userIndex: 0, // Alice
-        userId: '',
-        details: {
-          title: 'Yoga Mat',
-          description: 'Lightly used yoga mat, perfect for home workouts or yoga classes.',
-          category: 'Sports',
-          tags: ['yoga', 'fitness', 'exercise', 'mat'],
-          images: ['yoga1.jpg'],
-          condition: 'good'
-        },
-        location: {
-          latitude: 40.7128,
-          longitude: -74.0060,
-          address: '123 Main St, New York, NY 10001'
-        }
+        title: '24” IPS Monitor',
+        description: '1080p IPS, HDMI/DisplayPort, includes stand.',
+        category: 'Electronics',
+        tags: ['monitor', 'display'],
+        images: [
+          'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=1200&q=80'
+        ],
+        condition: 'good' as const,
       },
       {
-        userIndex: 1, // Bob
-        userId: '',
-        details: {
-          title: 'Potted Plants',
-          description: 'Three small potted plants - snake plant, pothos, and spider plant. Great for beginners.',
-          category: 'Garden',
-          tags: ['plants', 'indoor', 'garden', 'green', 'air-purifying'],
-          images: ['plants1.jpg', 'plants2.jpg'],
-          condition: 'good',
-          pickupInstructions: 'Handle with care, bring your own containers'
-        },
-        location: {
-          latitude: 40.7589,
-          longitude: -73.9851,
-          address: '456 Broadway, New York, NY 10013'
-        }
-      }
+        title: 'DSLR Camera Backpack',
+        description: 'Fits body + 3 lenses, rain cover included.',
+        category: 'Accessories',
+        tags: ['camera', 'bag'],
+        images: [
+          'https://images.unsplash.com/photo-1523419400520-2234951cf4aa?auto=format&fit=crop&w=1200&q=80'
+        ],
+        condition: 'good' as const,
+      },
+      {
+        title: 'Yoga Mat',
+        description: '5mm thick, non-slip, teal color.',
+        category: 'Sports',
+        tags: ['yoga', 'fitness'],
+        images: [
+          'https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&w=1200&q=80'
+        ],
+        condition: 'good' as const,
+      },
+      {
+        title: 'Standing Desk Converter',
+        description: 'Manual lift, fits dual monitors, black.',
+        category: 'Furniture',
+        tags: ['desk', 'standing'],
+        images: [
+          'https://images.unsplash.com/photo-1487014679447-9f8336841d58?auto=format&fit=crop&w=1200&q=80'
+        ],
+        condition: 'good' as const,
+      },
+      {
+        title: 'Bedside Table Lamp',
+        description: 'Warm LED bulb included, fabric shade.',
+        category: 'Home',
+        tags: ['lamp', 'lighting'],
+        images: [
+          'https://images.unsplash.com/photo-1493663284031-b7e3aefcae8e?auto=format&fit=crop&w=1200&q=80'
+        ],
+        condition: 'like-new' as const,
+      },
+      {
+        title: 'Bluetooth Speaker',
+        description: 'Portable, 12h battery, USB-C charge.',
+        category: 'Electronics',
+        tags: ['audio', 'speaker'],
+        images: [
+          'https://images.unsplash.com/photo-1519666213634-3493b6dcd82e?auto=format&fit=crop&w=1200&q=80'
+        ],
+        condition: 'like-new' as const,
+      },
+      {
+        title: 'Air Fryer 3.5qt',
+        description: 'Non-stick basket, includes manual.',
+        category: 'Kitchen',
+        tags: ['air-fryer', 'appliance'],
+        images: [
+          'https://images.unsplash.com/photo-1510626176961-4b37d0b4e904?auto=format&fit=crop&w=1200&q=80'
+        ],
+        condition: 'good' as const,
+      },
+      {
+        title: 'Hiking Backpack 30L',
+        description: 'Lightweight daypack with rain cover.',
+        category: 'Outdoors',
+        tags: ['backpack', 'hiking'],
+        images: [
+          'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?auto=format&fit=crop&w=1200&q=80'
+        ],
+        condition: 'good' as const,
+      },
+      {
+        title: 'Floor Pump for Road Bike',
+        description: 'With gauge, Presta/Schrader compatible.',
+        category: 'Sports',
+        tags: ['bike', 'pump'],
+        images: [
+          'https://images.unsplash.com/photo-1508606572321-901ea443707f?auto=format&fit=crop&w=1200&q=80'
+        ],
+        condition: 'like-new' as const,
+      },
+      {
+        title: 'Box of Novels (5)',
+        description: 'Assorted contemporary fiction, good condition.',
+        category: 'Books',
+        tags: ['books', 'fiction'],
+        images: [
+          'https://images.unsplash.com/photo-1495446815901-a7297e633e8d?auto=format&fit=crop&w=1200&q=80'
+        ],
+        condition: 'good' as const,
+      },
+      {
+        title: 'Kids Toy Bundle',
+        description: 'Wooden blocks, puzzle, small car set.',
+        category: 'Kids',
+        tags: ['toys', 'kids'],
+        images: [
+          'https://images.unsplash.com/photo-1503454537195-1dcabb73ffb9?auto=format&fit=crop&w=1200&q=80'
+        ],
+        condition: 'good' as const,
+      },
+      {
+        title: 'Stainless Cookware Set (3pc)',
+        description: 'Saucepan, sauté pan, stock pot with lids.',
+        category: 'Kitchen',
+        tags: ['cookware', 'kitchen'],
+        images: [
+          'https://images.unsplash.com/photo-1475855581690-80accde3ae2b?auto=format&fit=crop&w=1200&q=80'
+        ],
+        condition: 'good' as const,
+      },
+      {
+        title: 'Potted Snake Plant',
+        description: '12” tall, low maintenance, ceramic pot.',
+        category: 'Home',
+        tags: ['plant', 'indoor'],
+        images: [
+          'https://images.unsplash.com/photo-1501004318641-b39e6451bec6?auto=format&fit=crop&w=1200&q=80'
+        ],
+        condition: 'good' as const,
+      },
+      {
+        title: 'Power Drill + Bits',
+        description: 'Cordless 18V, two batteries, bit set included.',
+        category: 'Tools',
+        tags: ['drill', 'tools'],
+        images: [
+          'https://images.unsplash.com/photo-1503389152951-9f343605f61e?auto=format&fit=crop&w=1200&q=80'
+        ],
+        condition: 'good' as const,
+      },
+      {
+        title: 'Patio String Lights',
+        description: '48ft LED shatterproof bulbs, warm white.',
+        category: 'Home',
+        tags: ['lights', 'patio'],
+        images: [
+          'https://images.unsplash.com/photo-1505693416388-ac5ce068fe85?auto=format&fit=crop&w=1200&q=80'
+        ],
+        condition: 'like-new' as const,
+      },
+      {
+        title: 'Foam Roller',
+        description: '24” medium density, great for recovery.',
+        category: 'Sports',
+        tags: ['fitness', 'recovery'],
+        images: [
+          'https://images.unsplash.com/photo-1518611012118-696072aa579a?auto=format&fit=crop&w=1200&q=80'
+        ],
+        condition: 'like-new' as const,
+      },
     ];
+
+    // Create ~20 distinct items, distribute across users round-robin
+    const itemsData: Array<CreateItemData & { userIndex: number }> = productTemplates.map((template, idx) => {
+      const userIndex = idx % users.length;
+      const userLoc = users[userIndex].location;
+      return {
+        userIndex,
+        userId: '',
+        details: {
+          title: template.title,
+          description: template.description,
+          category: template.category,
+          tags: template.tags,
+          images: template.images,
+          condition: template.condition,
+          pickupInstructions: template.pickupInstructions,
+        },
+        location: {
+          latitude: userLoc.latitude,
+          longitude: userLoc.longitude,
+          address: userLoc.address,
+        },
+      };
+    });
 
     const items: Item[] = [];
     
@@ -252,7 +352,7 @@ export class SeedData {
       const item = Item.create(itemData);
       items.push(item);
 
-      // Insert item into database
+      // Insert item into database (idempotent) — if already exists, update core fields
       const itemDataForDb = item.toData();
       const query = `
         INSERT INTO items (
@@ -262,6 +362,21 @@ export class SeedData {
         ) VALUES (
           $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
         )
+        ON CONFLICT (id) DO UPDATE SET
+          user_id = EXCLUDED.user_id,
+          title = EXCLUDED.title,
+          description = EXCLUDED.description,
+          category = EXCLUDED.category,
+          tags = EXCLUDED.tags,
+          images = EXCLUDED.images,
+          condition = EXCLUDED.condition,
+          status = EXCLUDED.status,
+          latitude = EXCLUDED.latitude,
+          longitude = EXCLUDED.longitude,
+          address = EXCLUDED.address,
+          dimensions = EXCLUDED.dimensions,
+          pickup_instructions = EXCLUDED.pickup_instructions,
+          updated_at = EXCLUDED.updated_at
       `;
 
       const params = [
@@ -328,6 +443,8 @@ export class SeedData {
       
       // Accept the first exchange and complete it with ratings
       if (exchangeData.giverIndex === 0) {
+        // valid transitions: available -> pending -> exchanged
+        item.markAsPending();
         exchange.accept(exchangeData.scheduledPickup);
         exchange.complete(50); // Award 50 eco points
         

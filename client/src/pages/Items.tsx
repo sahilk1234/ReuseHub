@@ -36,6 +36,9 @@ export default function Items() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState(0);
+  const [page, setPage] = useState(1);
+  const [limit] = useState(12);
+  const [hasMore, setHasMore] = useState(false);
   
   const [filters, setFilters] = useState<SearchFilters>({
     searchTerm: '',
@@ -65,7 +68,7 @@ export default function Items() {
 
   useEffect(() => {
     fetchItems();
-  }, []);
+  }, [page]);
 
   const fetchItems = async () => {
     setLoading(true);
@@ -74,8 +77,8 @@ export default function Items() {
     try {
       const params = new URLSearchParams();
       params.append('status', 'available');
-      params.append('limit', '20');
-      params.append('offset', '0');
+      params.append('limit', limit.toString());
+      params.append('offset', ((page - 1) * limit).toString());
       
       if (filters.searchTerm) {
         params.append('searchTerm', filters.searchTerm);
@@ -104,6 +107,7 @@ export default function Items() {
       const data = await response.json();
       setItems(data.data.items);
       setTotalCount(data.data.totalCount);
+      setHasMore(data.data.hasMore ?? data.data.items.length + (page - 1) * limit < data.data.totalCount);
     } catch (err: any) {
       setError(err.message || 'Failed to load items');
     } finally {
@@ -113,7 +117,7 @@ export default function Items() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    fetchItems();
+    setPage(1);
   };
 
   const handleFilterChange = (name: string, value: string | number) => {
@@ -323,7 +327,8 @@ export default function Items() {
       {/* Results Count */}
       {!loading && (
         <div className="mb-4 text-sm text-gray-600">
-          Found {totalCount} item{totalCount !== 1 ? 's' : ''}
+          Showing {Math.min((page - 1) * limit + 1, totalCount)}-
+          {Math.min(page * limit, totalCount)} of {totalCount} item{totalCount !== 1 ? 's' : ''}
         </div>
       )}
 
@@ -421,6 +426,29 @@ export default function Items() {
             </div>
           )}
         </>
+      )}
+
+      {/* Pagination */}
+      {!loading && !error && totalCount > limit && (
+        <div className="mt-8 flex items-center justify-between">
+          <button
+            className="btn-secondary"
+            disabled={page === 1}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
+          >
+            Previous
+          </button>
+          <div className="text-sm text-gray-600">
+            Page {page} of {Math.max(1, Math.ceil(totalCount / limit))}
+          </div>
+          <button
+            className="btn-secondary"
+            disabled={!hasMore && page * limit >= totalCount}
+            onClick={() => setPage((p) => p + 1)}
+          >
+            Next
+          </button>
+        </div>
       )}
     </div>
   );
