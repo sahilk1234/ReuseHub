@@ -7,8 +7,8 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci --only=production && npm cache clean --force
+# Install all deps (including dev) for building
+RUN npm ci && npm cache clean --force
 
 # Copy source code
 COPY . .
@@ -26,10 +26,12 @@ WORKDIR /app
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S reusenet -u 1001
 
-# Copy built application and node_modules from builder stage
+# Install production deps only
+COPY package*.json ./
+RUN npm ci --omit=dev && npm cache clean --force
+
+# Copy built application from builder
 COPY --from=builder --chown=reusenet:nodejs /app/dist ./dist
-COPY --from=builder --chown=reusenet:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=reusenet:nodejs /app/package*.json ./
 
 # Create uploads directory for local file storage
 RUN mkdir -p uploads && chown reusenet:nodejs uploads
