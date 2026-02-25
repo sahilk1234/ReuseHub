@@ -127,7 +127,8 @@ export function rateLimit(options: {
     if (skipSuccessfulRequests) {
       const originalSend = res.send;
       res.send = function (data: any): Response {
-        if (res.statusCode < 400) {
+        const currentStatus = typeof res.statusCode === 'number' ? res.statusCode : 200;
+        if (currentStatus < 400) {
           const entry = (rateLimiter as any).requests.get(key);
           if (entry && entry.count > 0) {
             entry.count--;
