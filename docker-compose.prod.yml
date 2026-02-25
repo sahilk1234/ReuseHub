@@ -1,184 +1,68 @@
-version: '3.8'
+version: "3.9"
 
 services:
-  app:
-    build: 
-      context: .
-      dockerfile: Dockerfile
-      target: production
-    ports:
-      - "${PORT:-3000}:3000"
-    environment:
-      - NODE_ENV=production
-      - PORT=${PORT:-3000}
-      
-      # Database configuration
-      - DATABASE_TYPE=${DATABASE_TYPE:-postgresql}
-      - DATABASE_URL=${DATABASE_URL}
-      - DATABASE_HOST=${DATABASE_HOST:-database}
-      - DATABASE_PORT=${DATABASE_PORT:-5432}
-      - DATABASE_NAME=${DATABASE_NAME:-reusenet}
-      - DATABASE_USERNAME=${DATABASE_USERNAME}
-      - DATABASE_PASSWORD=${DATABASE_PASSWORD}
-      
-      # Storage configuration
-      - STORAGE_PROVIDER=${STORAGE_PROVIDER:-aws-s3}
-      - AWS_REGION=${AWS_REGION}
-      - AWS_S3_BUCKET=${AWS_S3_BUCKET}
-      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
-      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
-      
-      # Auth configuration
-      - AUTH_PROVIDER=${AUTH_PROVIDER:-custom}
-      - JWT_SECRET=${JWT_SECRET}
-      - JWT_EXPIRES_IN=${JWT_EXPIRES_IN:-24h}
-      - REFRESH_TOKEN_EXPIRES_IN=${REFRESH_TOKEN_EXPIRES_IN:-7d}
-      
-      # AI configuration
-      - AI_PROVIDER=${AI_PROVIDER:-openai}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-4-vision-preview}
-      - OPENAI_MAX_TOKENS=${OPENAI_MAX_TOKENS:-1000}
-      
-      # Maps configuration
-      - MAPS_PROVIDER=${MAPS_PROVIDER:-google}
-      - GOOGLE_MAPS_API_KEY=${GOOGLE_MAPS_API_KEY}
-      
-      # Notification configuration
-      - NOTIFICATION_PROVIDER=${NOTIFICATION_PROVIDER:-sendgrid}
-      - SENDGRID_API_KEY=${SENDGRID_API_KEY}
-      - SENDGRID_FROM_EMAIL=${SENDGRID_FROM_EMAIL}
-      
-      # CORS configuration
-      - CORS_ORIGIN=${CORS_ORIGIN}
-      - CORS_CREDENTIALS=${CORS_CREDENTIALS:-true}
-      
-      # Rate limiting
-      - RATE_LIMIT_WINDOW_MS=${RATE_LIMIT_WINDOW_MS:-900000}
-      - RATE_LIMIT_MAX=${RATE_LIMIT_MAX:-100}
-    
-    depends_on:
-      database:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-    
+  api:
+    image: ghcr.io/${GHCR_OWNER:-sahilk1234}/reusehub-api:latest
     restart: unless-stopped
-    
+    env_file:
+      - ./env/api.env
+    depends_on:
+      - database
+      - redis
+    expose:
+      - "3000"
     networks:
-      - reusenet-network
-    
-    # Resource limits for production
-    deploy:
-      resources:
-        limits:
-          cpus: '2'
-          memory: 2G
-        reservations:
-          cpus: '0.5'
-          memory: 512M
-    
-    # Logging configuration
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    
-    # Health check
-    healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
+      - web
+
+  client:
+    image: ghcr.io/${GHCR_OWNER:-sahilk1234}/reusehub-client:latest
+    restart: unless-stopped
+    env_file:
+      - ./env/client.env
+    expose:
+      - "80"
+    networks:
+      - web
 
   database:
-    image: postgres:15-alpine
-    environment:
-      - POSTGRES_DB=${DATABASE_NAME:-reusenet}
-      - POSTGRES_USER=${DATABASE_USERNAME}
-      - POSTGRES_PASSWORD=${DATABASE_PASSWORD}
-      # Performance tuning for production
-      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --lc-collate=C --lc-ctype=C
-    
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
-    
+    image: postgres:16
     restart: unless-stopped
-    
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-password}
+      POSTGRES_DB: ${POSTGRES_DB:-reusenet_prod}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
     networks:
-      - reusenet-network
-    
-    # Resource limits
-    deploy:
-      resources:
-        limits:
-          cpus: '1'
-          memory: 1G
-        reservations:
-          cpus: '0.25'
-          memory: 256M
-    
-    # Logging configuration
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    
-    # Health check
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USERNAME} -d ${DATABASE_NAME}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 10s
+      - web
 
   redis:
     image: redis:7-alpine
-    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD:-}
-    
-    volumes:
-      - redis_data:/data
-    
     restart: unless-stopped
-    
     networks:
-      - reusenet-network
-    
-    # Resource limits
-    deploy:
-      resources:
-        limits:
-          cpus: '0.5'
-          memory: 512M
-        reservations:
-          cpus: '0.1'
-          memory: 128M
-    
-    # Logging configuration
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    
-    # Health check
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-      start_period: 5s
+      - web
 
-volumes:
-  postgres_data:
-    driver: local
-  redis_data:
-    driver: local
+  caddy:
+    image: caddy:2.8
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+      - client
+    networks:
+      - web
 
 networks:
-  reusenet-network:
+  web:
     driver: bridge
+
+volumes:
+  pgdata:
+  caddy_data:
+  caddy_config:
