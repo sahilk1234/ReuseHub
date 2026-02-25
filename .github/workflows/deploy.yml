@@ -48,5 +48,5 @@ jobs:
         script: |
           set -e
           cd /srv/stack   # adjust if your stack lives elsewhere
-          docker compose -f docker-compose.prod.yml pull
-          docker compose -f docker-compose.prod.yml up -d --remove-orphans
+          docker compose -f docker-compose.yml pull
+          docker compose -f docker-compose.yml up -d --remove-orphans
