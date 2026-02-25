@@ -25,7 +25,7 @@ services:
       - web
 
   database:
-    image: postgres:16
+    image: postgis/postgis:16-3.4-alpine
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
