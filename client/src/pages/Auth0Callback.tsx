@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useAuth0 } from '@auth0/auth0-react';
 import { useNavigate } from 'react-router-dom';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+const API_URL = import.meta.env.VITE_API_URL || '/api';
 
 export default function Auth0Callback() {
   const { isAuthenticated, isLoading, user, getAccessTokenSilently, error: auth0Error } = useAuth0();
